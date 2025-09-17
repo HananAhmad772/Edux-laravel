@@ -29,7 +29,9 @@ class User extends Authenticatable
         'password',
         'phone',
         'user_type',
-        'status'
+        'status',
+        'reset_password_otp',
+        'reset_password_otp_expiry'
 
     ];
 

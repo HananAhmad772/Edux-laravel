@@ -3,73 +3,324 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\CompanyRegisterRequest;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
+use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\MentorRegisterRequest;
 use App\Http\Requests\Auth\ProfessionalRegisterRequest;
 use App\Http\Requests\Auth\RegisterationRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\StudentRegisterRequest;
+use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Resources\UserResources;
+use App\Models\User;
 use App\Services\AuthServices;
+use App\Services\AdminServices;
+use App\Traits\ApiResponses;
 use Illuminate\Http\Request as ModelRequest;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    // use ApiResponse;
+    use ApiResponses;
 
     protected $authService;
+    protected $adminService;
 
-    public function __construct(AuthServices $authService)
+    public function __construct(AuthServices $authService, AdminServices $adminService)
     {
         $this->authService = $authService;
+        $this->adminService = $adminService;
     }
 
     public function register(RegisterationRequest $request)
     {
         try {
-            //code...
-        
-        // validated base data
-        $validated = $request->validated();
-        $type = $validated['user_type'];
 
-        // perform type-specific validation by using the FormRequest rules
-        $profileRules = [];
-        switch ($type) {
-            case 'student':
-                $profileRules = (new StudentRegisterRequest())->rules();
-                break;
-            case 'mentor':
-                $profileRules = (new MentorRegisterRequest())->rules();
-                break;
-            case 'professional':
-                $profileRules = (new ProfessionalRegisterRequest())->rules();
-                break;
-            case 'company':
-                $profileRules = (new CompanyRegisterRequest())->rules();
-                break;
-        }
+            $registrationRules = (new RegisterationRequest())->rules();
+            $validator = Validator::make($request->all(), $registrationRules);
 
-        // merge additional rules and validate
-        if (!empty($profileRules)) {
-            $validator = Validator::make($request->all(), $profileRules);
-          if ($validator->fails()) {
-            return $this->errorResponse('Validation failed', 422, $validator->errors()->toArray());
-        }
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray());
+            }
 
-            $validated = array_merge($validated, $validator->validated());
-        }
+            $validated = $validator->validated();
+            $type = $validated['user_type'];
 
-        // call service (service uses DB::transaction)
-        $user = $this->authService->register($validated);
+            $profileRules = [];
+            switch ($type) {
+                case 'student':
+                    $profileRules = (new StudentRegisterRequest())->rules();
+                    break;
+                case 'mentor':
+                    $profileRules = (new MentorRegisterRequest())->rules();
+                    break;
+                case 'professional':
+                    $profileRules = (new ProfessionalRegisterRequest())->rules();
+                    break;
+                case 'company':
+                    $profileRules = (new CompanyRegisterRequest())->rules();
+                    break;
+            }
 
-        $userResources = new UserResources($user);
+            if (!empty($profileRules)) {
+                $validator = Validator::make($request->all(), $profileRules);
 
-        // return success with standardized resource
-        return $this->successResponse($user, 'User registered successfully', 201);
+                if ($validator->fails()) {
+                    return $this->validationErrorResponse($validator->errors()->toArray());
+                }
+
+                $validated = array_merge($validated, $validator->validated());
+            }
+
+            $user = $this->authService->register($validated);
+
+            $userResources = new UserResources($user);
+
+            return $this->successResponse($userResources, 'User registered successfully', 201);
 
         } catch (\Throwable $th) {
             \Log::error('Registration failed: ' . $th->getMessage());
-            return $this->errorResponse('User registration failed. Please Try again', 500);
+            return $this->internalServerErrorResponse('User registration failed. Please Try again');
         }
     }
-}
+
+        public function createUser(RegisterationRequest $request)
+    {
+        try {
+
+            $registrationRules = (new RegisterationRequest())->rules();
+            $validator = Validator::make($request->all(), $registrationRules);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray());
+            }
+
+            $validated = $validator->validated();
+            $type = $validated['user_type'];
+
+            $profileRules = [];
+            switch ($type) {
+                case 'student':
+                    $profileRules = (new StudentRegisterRequest())->rules();
+                    break;
+                case 'mentor':
+                    $profileRules = (new MentorRegisterRequest())->rules();
+                    break;
+                case 'professional':
+                    $profileRules = (new ProfessionalRegisterRequest())->rules();
+                    break;
+                case 'company':
+                    $profileRules = (new CompanyRegisterRequest())->rules();
+                    break;
+            }
+
+            if (!empty($profileRules)) {
+                $validator = Validator::make($request->all(), $profileRules);
+
+                if ($validator->fails()) {
+                    return $this->validationErrorResponse($validator->errors()->toArray());
+                }
+
+                $validated = array_merge($validated, $validator->validated());
+            }
+
+            $user = $this->authService->register($validated);
+
+            $userResources = new UserResources($user);
+
+            return $this->successResponse($userResources, 'User registered successfully', 201);
+
+        } catch (\Throwable $th) {
+            \Log::error('Registration failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('User registration failed. Please Try again');
+        }
+    }
+
+    public function login(LoginRequest $request)
+    {
+        try {
+            $loginRules = (new LoginRequest())->rules();
+            $validator = \Validator::make($request->all(), $loginRules);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray(), 'Validation failed');
+            }
+
+            $credentials = $validator->validated();
+
+            if (!$data = $this->authService->login($credentials)) {
+                return $this->errorResponse('Invalid credentials', 401);
+            }
+
+            return $this->successResponse($data, 'Login successful', 200);
+
+        } catch (\Throwable $th) {
+            \Log::error('Login failed: ' . $th->getMessage());
+            return $this->errorResponse('User login failed. Please try again', 500);
+        }
+    }
+
+    public function logoutfromalldevices(ModelRequest $request)
+    {
+        try {
+            $user = $request->user();
+            $user->tokens()->delete();
+
+            return $this->successResponse(null, 'Logout successful from all devices', 200);
+        } catch (\Throwable $th) {
+            \Log::error('Logout failed: ' . $th->getMessage());
+            return $this->errorResponse('User logout failed. Please Try again', 500);
+        }
+    }
+
+    public function logout(ModelRequest $request)
+    {
+        try {
+            $user = $request->user();
+
+            // Delete only the token used in this request
+            $request->user()->currentAccessToken()->delete();
+
+            return $this->successResponse(null, 'Logged out from current device successfully', 200);
+        } catch (\Throwable $th) {
+            \Log::error('Logout failed: ' . $th->getMessage());
+            return $this->errorResponse('User logout failed. Please try again', 500);
+        }
+    }
+
+   public function sendOtp(ForgotPasswordRequest $request)
+    {
+
+        $email = $request->email ?? null;
+        $phone = $request->phone ?? null;
+
+        if ($email) {
+            $result = $this->authService->sendOtpToEmail($email);
+        } elseif ($phone) {
+            $result = $this->authService->sendOtpToPhone($phone); // you can create this
+        } else {
+            return $this->errorResponse('Email or Phone is required');
+        }
+
+        if (!$result['status']) {
+            return $this->errorResponse($result['message']);
+        }
+
+        return $this->successResponse(null, $result['message']);
+    }
+
+    public function verifyOtp(VerifyOtpRequest $request)
+    {
+        // This is clean now
+        return $this->authService->verifyOtp($request->email, $request->otp);
+    }
+
+     public function resetPassword(ResetPasswordRequest $request)
+    {
+        return $this->authService->resetPassword(
+            $request->email,
+            $request->otp,
+            $request->password
+        );
+    }
+
+    public function profile()
+    {
+        $user = User::with('studentProfile', 'mentorProfile', 'professionalProfile', 'companyProfile')
+            ->find(auth()->id());
+
+        return $this->successResponse(new UserResources($user), 'User profile fetched successfully');
+    }
+
+    public function deleteAccount(ModelRequest $request)
+    {
+        $ids = $request->input('ids'); // can be single ID or array of IDs
+
+        if (empty($ids)) {
+            return $this->errorResponse('No user IDs provided', 400);
+        }
+
+        $result = $this->adminService->softDeleteUsers($ids);
+
+        return $this->successResponse(null, $result['message']);
+    }
+
+    public function restoreAccount(ModelRequest $request)
+    {
+        $ids = $request->input('ids'); // can be single ID or array of IDs
+
+        if (empty($ids)) {
+            return $this->errorResponse('No user IDs provided', 400);
+        }
+
+        $result = $this->adminService->restoreUsers($ids);
+
+        return $this->successResponse(null, $result['message']);
+    }
+
+
+    public function changePassword(ModelRequest $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required',
+            'password'         => 'required|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->validationErrorResponse($validator->errors()->toArray());
+        }
+
+        $result = $this->authService->changePassword(
+            auth()->id(),
+            $request->current_password,
+            $request->password
+        );
+
+        if (!$result['status']) {
+            return $this->errorResponse($result['message'], $result['code']);
+        }
+
+        return $this->successResponse(null, $result['message']);
+    }
+
+    public function updateUserStatus(ModelRequest $request, $userId)
+    {
+        $request->validate([
+            'status' => 'required|string|in:pending,under_review,rejected,locked,approved'
+        ]);
+
+        $result = $this->adminService->updateUserStatus($userId, $request->status);
+
+        if (!$result['status']) {
+            return $this->errorResponse($result['message'], 404);
+        }
+
+        return $this->successResponse(null, $result['message']);
+    }
+
+    public function getDeletedUsers(ModelRequest $request)
+    {
+        $perPage = $request->query('per_page', 10);
+
+        $result = $this->adminService->getDeletedUsers($perPage);
+
+        return $this->successResponse($result['data'], $result['message']);
+    }
+
+    public function getUserById($id)
+    {
+        // Add relationships if needed
+        $relations = ['studentProfile', 'mentorProfile', 'professionalProfile', 'companyProfile'];
+
+        $result = $this->adminService->getUserById($id, $relations);
+
+        if (!$result['status']) {
+            return $this->errorResponse($result['message'], 404);
+        }
+
+        return $this->successResponse($result['data'], $result['message']);
+    }
+
+
+    }
+

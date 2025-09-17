@@ -5,7 +5,8 @@ namespace App\Http\Requests\Auth;
 use App\Traits\ApiResponses;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
-class RegisterationRequest extends FormRequest
+
+class ForgotPasswordRequest extends FormRequest
 {
     use ApiResponses;
     /**
@@ -23,17 +24,13 @@ class RegisterationRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'first_name'    => 'required|string|max:255',
-            'last_name'     => 'required|string|max:255',
-            'email'         => 'required|email|max:255|unique:users,email',
-            'password'      => 'required|string|min:8|confirmed',
-            'phone'         => 'required|string|max:15|unique:users,phone',
-            'user_type'     => 'required|in:student,company,mentor,professional',
+       return [
+            'email' => 'nullable|email|required_without:phone|exists:users,email',
+            'phone' => 'nullable|string|min:10|max:15|required_without:email|exists:users,phone',
         ];
     }
 
-      protected function failedValidation(Validator $validator)
+          protected function failedValidation(Validator $validator)
     {
         $firstError = $validator->errors()->first();
 
