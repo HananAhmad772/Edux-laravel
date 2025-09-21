@@ -15,6 +15,7 @@ use App\Http\Resources\UserResources;
 use App\Models\User;
 use App\Services\AuthServices;
 use App\Services\AdminServices;
+use App\Services\ProfileService;
 use App\Traits\ApiResponses;
 use Illuminate\Http\Request as ModelRequest;
 use Illuminate\Support\Facades\Validator;
@@ -25,11 +26,13 @@ class AuthController extends Controller
 
     protected $authService;
     protected $adminService;
+    protected $profileService;
 
-    public function __construct(AuthServices $authService, AdminServices $adminService)
+    public function __construct(AuthServices $authService, AdminServices $adminService, ProfileService $profileService)
     {
         $this->authService = $authService;
         $this->adminService = $adminService;
+        $this->profileService = $profileService;
     }
 
     public function register(RegisterationRequest $request)
@@ -230,6 +233,41 @@ class AuthController extends Controller
             ->find(auth()->id());
 
         return $this->successResponse(new UserResources($user), 'User profile fetched successfully');
+    }
+
+    public function updateProfile(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Validate the request
+            $updateProfileRequest = new \App\Http\Requests\User\UpdateProfileRequest();
+            $rules = $updateProfileRequest->rules();
+            $messages = $updateProfileRequest->messages();
+            
+            $validator = Validator::make($request->all(), $rules, $messages);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray());
+            }
+
+            $validatedData = $validator->validated();
+
+            // Update the profile
+            $result = $this->profileService->updateProfile($userId, $validatedData);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            $userResources = new UserResources($result['data']);
+
+            return $this->successResponse($userResources, $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Profile update failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Profile update failed. Please try again');
+        }
     }
 
     public function deleteAccount(ModelRequest $request)

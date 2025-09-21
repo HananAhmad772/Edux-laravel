@@ -23,7 +23,7 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
     Route::post('/logout-all', 'logoutfromAllDevices');
     Route::get('/profile', 'profile');
     Route::post('/change-password', 'changePassword');
-    Route::post('/update-profile/{id}', 'updateProfile');
+    Route::post('/update-profile', 'updateProfile');
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()
