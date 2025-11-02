@@ -5,6 +5,7 @@ use App\Models\StudentProfile;
 use App\Models\MentorProfile;
 use App\Models\ProfessionalProfile;
 use App\Models\CompanyProfile;
+use App\Models\StudentQuiz;
 
 class ProfileRepository
 {
@@ -90,5 +91,15 @@ class ProfileRepository
     public function getCompanyProfile($userId)
     {
         return CompanyProfile::where('user_id', $userId)->first();
+    }
+    
+    public function createStudentQuiz(array $data)
+    {
+        return StudentQuiz::create($data);
+    }
+    
+    public function getStudentQuizzes($studentId)
+    {
+        return StudentQuiz::where('student_id', $studentId)->get();
     }
 }

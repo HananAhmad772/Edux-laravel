@@ -17,7 +17,13 @@ class StudentProfile extends Model
         'class_year',
         'institute',
         'major_subject',
-        'bio'
+        'bio',
+        'current_position',
+        'specialization_field',
+        'preferred_technologies',
+        'current_skill_level',
+        'main_goal',
+        'time_per_week'
     ];
 
         public function user()

@@ -21,6 +21,12 @@ class StudentRegisterResource extends JsonResource
             'institute'    => $this->institute,
             'major_subject'=> $this->major_subject,
             'bio'          => $this->bio,
+            'current_position' => $this->current_position,
+            'specialization_field' => $this->specialization_field,
+            'preferred_technologies' => $this->preferred_technologies,
+            'current_skill_level' => $this->current_skill_level,
+            'main_goal' => $this->main_goal,
+            'time_per_week' => $this->time_per_week,
         ];
     }
 }

@@ -42,7 +42,7 @@ class AuthServices
                 'password'   => $data['password'],
                 'phone'      => $data['phone'],
                 'user_type'  => $data['user_type'],
-                'status'     => 'pending',
+                'status'     => 'approved',
             ];
 
             $user = $this->users->create($userPayload);

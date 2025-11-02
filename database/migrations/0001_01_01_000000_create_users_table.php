@@ -18,7 +18,7 @@ return new class extends Migration
             $t->string('email')->unique();
             $t->string('phone')->nullable()->unique();
             $t->string('password');
-            $t->enum('user_type', ['student','mentor','professional','company','admin']);
+            $t->enum('user_type', ['student','job-seeker','company','admin']);
             $t->boolean('is_admin')->default(false);
             $t->enum('status', ['pending','under_review','approved','rejected','locked'])->default('pending');
             $t->timestamp('email_verified_at')->nullable();
