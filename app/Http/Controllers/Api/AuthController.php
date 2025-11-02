@@ -10,7 +10,8 @@ use App\Http\Requests\Auth\ProfessionalRegisterRequest;
 use App\Http\Requests\Auth\RegisterationRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\StudentRegisterRequest;
-use App\Http\Requests\Auth\VerifyOtpRequest;
+use App\Http\Requests\StudentQuestionsRequest;
+use App\Http\Requests\StudentQuizRequest;
 use App\Http\Resources\UserResources;
 use App\Models\User;
 use App\Services\AuthServices;
@@ -19,6 +20,7 @@ use App\Services\ProfileService;
 use App\Traits\ApiResponses;
 use Illuminate\Http\Request as ModelRequest;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -76,10 +78,19 @@ class AuthController extends Controller
             }
 
             $user = $this->authService->register($validated);
+            
+            // Create authentication token for the registered user
+            Auth::login($user);
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             $userResources = new UserResources($user);
 
-            return $this->successResponse($userResources, 'User registered successfully', 201);
+            $responseData = [
+                'user' => $userResources,
+                'token' => $token
+            ];
+
+            return $this->successResponse($responseData, 'User registered successfully', 201);
 
         } catch (\Throwable $th) {
             \Log::error('Registration failed: ' . $th->getMessage());
@@ -128,10 +139,19 @@ class AuthController extends Controller
             }
 
             $user = $this->authService->register($validated);
+            
+            // Create authentication token for the registered user
+            Auth::login($user);
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             $userResources = new UserResources($user);
 
-            return $this->successResponse($userResources, 'User registered successfully', 201);
+            $responseData = [
+                'user' => $userResources,
+                'token' => $token
+            ];
+
+            return $this->successResponse($responseData, 'User registered successfully', 201);
 
         } catch (\Throwable $th) {
             \Log::error('Registration failed: ' . $th->getMessage());
@@ -358,7 +378,91 @@ class AuthController extends Controller
 
         return $this->successResponse($result['data'], $result['message']);
     }
+    
+    public function updateStudentQuestions(StudentQuestionsRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            $validatedData = $request->validated();
+            
+            // Update the student profile with questions data
+            $result = $this->profileService->updateStudentQuestions($userId, $validatedData);
 
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
 
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Student questions update failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Student questions update failed. Please try again');
+        }
     }
+    
+    public function storeStudentQuiz(StudentQuizRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            $validatedData = $request->validated();
+            
+            // Store the student quiz data
+            $result = $this->profileService->storeStudentQuiz($userId, $validatedData);
 
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message'], $result['code']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Student quiz storage failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Student quiz storage failed. Please try again');
+        }
+    }
+    
+    public function getStudentQuizzes(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Get the student quizzes
+            $result = $this->profileService->getStudentQuizzes($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Getting student quizzes failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting student quizzes failed. Please try again');
+        }
+    }
+    
+    /**
+     * Generate AI quiz for the student
+     */
+    public function generateAIQuiz(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Generate AI quiz based on student profile
+            $result = $this->profileService->generateAIQuiz($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('AI quiz generation failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('AI quiz generation failed. Please try again');
+        }
+    }
+}

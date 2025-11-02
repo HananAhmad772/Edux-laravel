@@ -24,6 +24,10 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
     Route::get('/profile', 'profile');
     Route::post('/change-password', 'changePassword');
     Route::post('/update-profile', 'updateProfile');
+    Route::post('/student/questions', 'updateStudentQuestions');
+    Route::post('/student/quiz', 'storeStudentQuiz');
+    Route::get('/student/quizzes', 'getStudentQuizzes');
+    Route::post('/student/generate-quiz', 'generateAIQuiz');
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()
@@ -36,4 +40,3 @@ Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->
     Route::get('/user/{id}', 'getUserById');
     Route::post('update-status/{id}','updateUserStatus');
 });
-

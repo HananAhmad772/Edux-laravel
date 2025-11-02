@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Repositories\UserRepository;
 use App\Repositories\ProfileRepository;
+use App\Services\AIQuizService;
 use App\Traits\ApiResponses;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -15,11 +16,13 @@ class ProfileService
 
     protected $users;
     protected $profiles;
+    protected $aiQuizService;
 
-    public function __construct(UserRepository $users, ProfileRepository $profiles)
+    public function __construct(UserRepository $users, ProfileRepository $profiles, AIQuizService $aiQuizService)
     {
         $this->users = $users;
         $this->profiles = $profiles;
+        $this->aiQuizService = $aiQuizService;
     }
 
     /**
@@ -89,7 +92,7 @@ class ProfileService
 
         switch ($userType) {
             case 'student':
-                $profileFields = ['dob', 'gender', 'class_year', 'institute', 'major_subject', 'bio'];
+                $profileFields = ['dob', 'gender', 'class_year', 'institute', 'major_subject', 'bio', 'current_position', 'specialization_field', 'preferred_technologies', 'current_skill_level', 'main_goal', 'time_per_week'];
                 break;
             case 'mentor':
                 $profileFields = ['qualifications', 'area_of_expertise', 'experience_years', 'institute', 'bio'];
@@ -171,5 +174,123 @@ class ProfileService
             'data' => $userWithProfile,
             'code' => 200
         ];
+    }
+    
+    /**
+     * Update student questions data
+     */
+    public function updateStudentQuestions($userId, array $data)
+    {
+        return DB::transaction(function () use ($userId, $data) {
+            $profile = $this->profiles->getStudentProfile($userId);
+            
+            if (!$profile) {
+                return [
+                    'status' => false,
+                    'message' => 'Student profile not found',
+                    'code' => 404
+                ];
+            }
+
+            $profile->update($data);
+
+            // Generate AI quiz questions based on updated profile
+            $quizResult = $this->aiQuizService->generateQuizQuestions($profile);
+            
+            if ($quizResult['success']) {
+                // Save the generated quiz
+                $quiz = $this->aiQuizService->saveQuiz($userId, $quizResult['data']);
+                
+                return [
+                    'status' => true,
+                    'message' => 'Student questions updated and quiz generated successfully',
+                    'data' => [
+                        'profile' => $profile,
+                        'quiz' => $quiz
+                    ],
+                    'code' => 200
+                ];
+            } else {
+                // Return profile update success but quiz generation failure
+                return [
+                    'status' => true,
+                    'message' => 'Student questions updated but failed to generate quiz: ' . $quizResult['message'],
+                    'data' => [
+                        'profile' => $profile,
+                        'quiz_error' => $quizResult['message']
+                    ],
+                    'code' => 200
+                ];
+            }
+        });
+    }
+    
+    /**
+     * Store student quiz data
+     */
+    public function storeStudentQuiz($userId, array $data)
+    {
+        return DB::transaction(function () use ($userId, $data) {
+            $quizData = array_merge($data, ['student_id' => $userId]);
+            $quiz = $this->profiles->createStudentQuiz($quizData);
+
+            return [
+                'status' => true,
+                'message' => 'Student quiz stored successfully',
+                'data' => $quiz,
+                'code' => 201
+            ];
+        });
+    }
+    
+    /**
+     * Get student quizzes
+     */
+    public function getStudentQuizzes($userId)
+    {
+        $quizzes = $this->profiles->getStudentQuizzes($userId);
+        
+        return [
+            'status' => true,
+            'message' => 'Student quizzes retrieved successfully',
+            'data' => $quizzes,
+            'code' => 200
+        ];
+    }
+    
+    /**
+     * Generate AI quiz for a student
+     */
+    public function generateAIQuiz($userId)
+    {
+        $profile = $this->profiles->getStudentProfile($userId);
+        
+        if (!$profile) {
+            return [
+                'status' => false,
+                'message' => 'Student profile not found',
+                'code' => 404
+            ];
+        }
+        
+        $quizResult = $this->aiQuizService->generateQuizQuestions($profile);
+        
+        if ($quizResult['success']) {
+            // Save the generated quiz
+            $quiz = $this->aiQuizService->saveQuiz($userId, $quizResult['data']);
+            
+            return [
+                'status' => true,
+                'message' => 'AI quiz generated successfully',
+                'data' => $quiz,
+                'code' => 200
+            ];
+        } else {
+            return [
+                'status' => false,
+                'message' => 'Failed to generate AI quiz: ' . $quizResult['message'],
+                'code' => 500
+            ];
+        }
     }
 }
