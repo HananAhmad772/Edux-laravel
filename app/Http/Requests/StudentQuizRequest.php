@@ -22,8 +22,8 @@ class StudentQuizRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'questions' => 'required|string',
-            'answers' => 'required|string',
+            'questions' => 'required',
+            'answers' => 'required',
             'score' => 'required|numeric|min:0|max:100',
         ];
     }

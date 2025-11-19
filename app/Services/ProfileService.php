@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Repositories\UserRepository;
 use App\Repositories\ProfileRepository;
 use App\Services\AIQuizService;
+use App\Services\AIRoadmapService;
 use App\Traits\ApiResponses;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -17,12 +18,14 @@ class ProfileService
     protected $users;
     protected $profiles;
     protected $aiQuizService;
+    protected $aiRoadmapService;
 
-    public function __construct(UserRepository $users, ProfileRepository $profiles, AIQuizService $aiQuizService)
+    public function __construct(UserRepository $users, ProfileRepository $profiles, AIQuizService $aiQuizService, AIRoadmapService $aiRoadmapService)
     {
         $this->users = $users;
         $this->profiles = $profiles;
         $this->aiQuizService = $aiQuizService;
+        $this->aiRoadmapService = $aiRoadmapService;
     }
 
     /**
@@ -250,6 +253,9 @@ class ProfileService
     {
         $quizzes = $this->profiles->getStudentQuizzes($userId);
         
+        // The StudentQuiz model already casts questions and answers to arrays,
+        // so we don't need to manually decode them
+        
         return [
             'status' => true,
             'message' => 'Student quizzes retrieved successfully',
@@ -292,5 +298,97 @@ class ProfileService
                 'code' => 500
             ];
         }
+    }
+    
+    /**
+     * Generate personalized learning roadmap for a student
+     */
+    public function generatePersonalizedRoadmap($userId)
+    {
+        \Illuminate\Support\Facades\Log::info('Starting personalized roadmap generation', ['user_id' => $userId]);
+        
+        $profile = $this->profiles->getStudentProfile($userId);
+        
+        if (!$profile) {
+            \Illuminate\Support\Facades\Log::warning('Student profile not found for roadmap generation', ['user_id' => $userId]);
+            return [
+                'status' => false,
+                'message' => 'Student profile not found',
+                'code' => 404
+            ];
+        }
+        
+        // Get student quizzes
+        $quizzes = $this->profiles->getStudentQuizzes($userId);
+        
+        // Convert quizzes to array format for the AI service
+        $quizData = $quizzes->toArray();
+        
+        \Illuminate\Support\Facades\Log::info('Student profile and quizzes retrieved', [
+            'user_id' => $userId,
+            'quiz_count' => count($quizData)
+        ]);
+        
+        // Generate roadmap using AI
+        $roadmapResult = $this->aiRoadmapService->generateLearningRoadmap($profile, $quizData);
+        
+        if ($roadmapResult['success']) {
+            // Save the generated roadmap
+            $roadmap = $this->profiles->createStudentRoadmap([
+                'student_id' => $userId,
+                'roadmap_content' => $roadmapResult['data']
+            ]);
+            
+            return [
+                'status' => true,
+                'message' => 'Personalized learning roadmap generated successfully',
+                'data' => $roadmap,
+                'code' => 200
+            ];
+        } else {
+            return [
+                'status' => false,
+                'message' => 'Failed to generate personalized learning roadmap: ' . $roadmapResult['message'],
+                'code' => 500
+            ];
+        }
+    }
+    
+    /**
+     * Get all roadmaps for a student
+     */
+    public function getStudentRoadmaps($userId)
+    {
+        $roadmaps = $this->profiles->getStudentRoadmaps($userId);
+        
+        return [
+            'status' => true,
+            'message' => 'Student roadmaps retrieved successfully',
+            'data' => $roadmaps,
+            'code' => 200
+        ];
+    }
+    
+    /**
+     * Get the latest roadmap for a student
+     */
+    public function getLatestStudentRoadmap($userId)
+    {
+        $roadmap = $this->profiles->getLatestStudentRoadmap($userId);
+        
+        if (!$roadmap) {
+            return [
+                'status' => false,
+                'message' => 'No roadmap found for this student',
+                'code' => 404
+            ];
+        }
+        
+        return [
+            'status' => true,
+            'message' => 'Latest student roadmap retrieved successfully',
+            'data' => $roadmap,
+            'code' => 200
+        ];
     }
 }

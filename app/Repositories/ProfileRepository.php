@@ -6,6 +6,7 @@ use App\Models\MentorProfile;
 use App\Models\ProfessionalProfile;
 use App\Models\CompanyProfile;
 use App\Models\StudentQuiz;
+use App\Models\StudentRoadmap;
 
 class ProfileRepository
 {
@@ -101,5 +102,20 @@ class ProfileRepository
     public function getStudentQuizzes($studentId)
     {
         return StudentQuiz::where('student_id', $studentId)->get();
+    }
+    
+    public function createStudentRoadmap(array $data)
+    {
+        return StudentRoadmap::create($data);
+    }
+    
+    public function getStudentRoadmaps($studentId)
+    {
+        return StudentRoadmap::where('student_id', $studentId)->get();
+    }
+    
+    public function getLatestStudentRoadmap($studentId)
+    {
+        return StudentRoadmap::where('student_id', $studentId)->latest()->first();
     }
 }

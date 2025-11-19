@@ -25,9 +25,13 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
     Route::post('/change-password', 'changePassword');
     Route::post('/update-profile', 'updateProfile');
     Route::post('/student/questions', 'updateStudentQuestions');
+    Route::post('/student/generate-quiz', 'generateAIQuiz');
     Route::post('/student/quiz', 'storeStudentQuiz');
     Route::get('/student/quizzes', 'getStudentQuizzes');
-    Route::post('/student/generate-quiz', 'generateAIQuiz');
+    Route::post('/student/generate-roadmap', 'generatePersonalizedRoadmap');
+    Route::get('/student/roadmaps', 'getStudentRoadmaps');
+    Route::get('/student/roadmap/latest', 'getLatestStudentRoadmap');
+   
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()

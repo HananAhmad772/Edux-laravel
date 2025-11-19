@@ -465,4 +465,85 @@ class AuthController extends Controller
             return $this->internalServerErrorResponse('AI quiz generation failed. Please try again');
         }
     }
+    
+    /**
+     * Generate personalized learning roadmap for the student
+     */
+    public function generatePersonalizedRoadmap(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            \Log::info('Roadmap generation endpoint called', ['user_id' => $userId]);
+            
+            // Generate personalized learning roadmap based on student profile and quiz data
+            $result = $this->profileService->generatePersonalizedRoadmap($userId);
+
+            if (!$result['status']) {
+                \Log::warning('Roadmap generation endpoint failed', [
+                    'user_id' => $userId,
+                    'error_message' => $result['message'],
+                    'error_code' => $result['code']
+                ]);
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            \Log::info('Roadmap generation endpoint successful', [
+                'user_id' => $userId,
+                'roadmap_id' => $result['data']['id'] ?? null
+            ]);
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Personalized roadmap generation failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Personalized roadmap generation failed. Please try again');
+        }
+    }
+    
+    /**
+     * Get all roadmaps for the student
+     */
+    public function getStudentRoadmaps(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Get all student roadmaps
+            $result = $this->profileService->getStudentRoadmaps($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Getting student roadmaps failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting student roadmaps failed. Please try again');
+        }
+    }
+    
+    /**
+     * Get the latest roadmap for the student
+     */
+    public function getLatestStudentRoadmap(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Get the latest student roadmap
+            $result = $this->profileService->getLatestStudentRoadmap($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Getting latest student roadmap failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting latest student roadmap failed. Please try again');
+        }
+    }
 }

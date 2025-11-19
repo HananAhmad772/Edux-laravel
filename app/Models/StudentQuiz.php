@@ -3,12 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class StudentQuiz extends Model
 {
-    use HasUlids;
-    
     protected $table = 'student_quiz';
     
     protected $fillable = [
@@ -16,6 +13,12 @@ class StudentQuiz extends Model
         'questions',
         'answers',
         'score'
+    ];
+    
+    protected $casts = [
+        'questions' => 'array',
+        'answers' => 'array',
+        'score' => 'decimal:2'
     ];
     
     public function student()

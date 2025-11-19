@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Services\AIQuizService;
+use App\Services\AIRoadmapService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,6 +15,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AIQuizService::class, function ($app) {
             return new AIQuizService();
+        });
+        
+        $this->app->singleton(AIRoadmapService::class, function ($app) {
+            return new AIRoadmapService();
         });
     }
 
