@@ -9,6 +9,7 @@ use App\Console\Commands\DebugEnvFileCommand;
 use App\Console\Commands\TestHFAPICommand;
 use App\Console\Commands\TestHFAPIQuizCommand;
 use App\Console\Commands\TestAIQuizServiceCommand;
+use App\Console\Commands\CheckRoadmapSchemaCommand;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -48,3 +49,8 @@ Artisan::command('test:hf-api-quiz', function () {
 Artisan::command('test:ai-quiz-service', function () {
     $this->call(TestAIQuizServiceCommand::class);
 })->purpose('Test AI Quiz Service directly');
+
+// Register the roadmap schema check command
+Artisan::command('check:roadmap-schema', function () {
+    $this->call(CheckRoadmapSchemaCommand::class);
+})->purpose('Check the student_roadmaps table schema');
