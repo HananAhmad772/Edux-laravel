@@ -73,9 +73,16 @@ class TestRoadmapGeneration extends Command
             $roadmap = $roadmapService->saveRoadmap($user->id, $result['data']);
             $this->info('Roadmap saved with ID: ' . $roadmap->id);
             
-            // Display a portion of the generated roadmap
-            $this->info('Generated roadmap preview:');
-            $this->line(substr($result['data'], 0, 500) . '...');
+            // Ask user if they want to see the complete roadmap
+            if ($this->confirm('Do you want to see the complete generated roadmap?')) {
+                $this->info('=== COMPLETE AI-GENERATED ROADMAP ===');
+                $this->line($result['data']);
+                $this->info('=== END OF ROADMAP ===');
+            } else {
+                // Display a portion of the generated roadmap
+                $this->info('Generated roadmap preview:');
+                $this->line(substr($result['data'], 0, 500) . '...');
+            }
         } else {
             $this->error('Failed to generate roadmap: ' . $result['message']);
         }

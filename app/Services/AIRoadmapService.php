@@ -131,62 +131,101 @@ class AIRoadmapService
      * @param array $quizData
      * @return string
      */
-    private function prepareRoadmapPrompt(StudentProfile $studentProfile, array $quizData)
-    {
-        // Extract profile data
-        $profileData = [
-            'major_subject' => $studentProfile->major_subject,
-            'current_position' => $studentProfile->current_position,
-            'specialization_field' => $studentProfile->specialization_field,
-            'preferred_technologies' => $studentProfile->preferred_technologies,
-            'current_skill_level' => $studentProfile->current_skill_level,
-            'main_goal' => $studentProfile->main_goal,
-            'time_per_week' => $studentProfile->time_per_week,
-        ];
 
-        // Create the prompt
-        $prompt = "You are an expert learning path advisor that creates personalized learning roadmaps for students based on their profile and quiz performance.\n\n";
-        $prompt .= "Student Profile:\n";
-        $prompt .= "- Major Subject: " . ($profileData['major_subject'] ?? 'Not specified') . "\n";
-        $prompt .= "- Current Position: " . ($profileData['current_position'] ?? 'Not specified') . "\n";
-        $prompt .= "- Specialization Field: " . ($profileData['specialization_field'] ?? 'Not specified') . "\n";
-        $prompt .= "- Preferred Technologies: " . ($profileData['preferred_technologies'] ?? 'Not specified') . "\n";
-        $prompt .= "- Current Skill Level: " . ($profileData['current_skill_level'] ?? 'Not specified') . "\n";
-        $prompt .= "- Main Goal: " . ($profileData['main_goal'] ?? 'Not specified') . "\n";
-        $prompt .= "- Time Available Per Week: " . ($profileData['time_per_week'] ?? 'Not specified') . "\n\n";
-        
-        // Add quiz data if available
-        if (!empty($quizData)) {
-            $prompt .= "Quiz Performance:\n";
-            foreach ($quizData as $quiz) {
-                $prompt .= "- Quiz ID: " . ($quiz['id'] ?? 'N/A') . "\n";
-                $prompt .= "- Score: " . ($quiz['score'] ?? 'N/A') . "%\n";
-                // Add more quiz details if needed
-            }
-            $prompt .= "\n";
+private function prepareRoadmapPrompt(StudentProfile $studentProfile, array $quizData)
+{
+    $profileData = [
+        'major_subject' => $studentProfile->major_subject ?? 'Not specified',
+        'current_position' => $studentProfile->current_position ?? 'Not specified',
+        'specialization_field' => $studentProfile->specialization_field ?? 'Not specified',
+        'preferred_technologies' => $studentProfile->preferred_technologies ?? 'Not specified',
+        'current_skill_level' => $studentProfile->current_skill_level ?? 'Not specified',
+        'main_goal' => $studentProfile->main_goal ?? 'Not specified',
+        'time_per_week' => $studentProfile->time_per_week ?? 'Not specified',
+    ];
+
+    $prompt = "
+You are an expert learning-path advisor. Generate a structured, personalized learning roadmap based on the student profile and quiz performance.
+
+IMPORTANT FORMATTING RULES:
+- Only the roadmap step headings (Week-based steps) must use **double asterisks**.
+- No other headings or text may use double asterisks.
+- Steps should be formatted like:
+  **Week 1–2: Foundations**
+  **Week 3–4: Backend Basics**
+
+STUDENT PROFILE
+- Major Subject: {$profileData['major_subject']}
+- Current Position: {$profileData['current_position']}
+- Specialization Field: {$profileData['specialization_field']}
+- Preferred Technologies: {$profileData['preferred_technologies']}
+- Current Skill Level: {$profileData['current_skill_level']}
+- Main Goal: {$profileData['main_goal']}
+- Time Available Per Week: {$profileData['time_per_week']}
+
+QUIZ PERFORMANCE SUMMARY
+";
+
+    if (!empty($quizData)) {
+        foreach ($quizData as $quiz) {
+            $quizId = $quiz['id'] ?? 'Unknown';
+            $score = $quiz['score'] ?? 'N/A';
+            $prompt .= "- Quiz ID: {$quizId} | Score: {$score}%\n";
         }
-        
-        $prompt .= "🎯 Your task:\n";
-        $prompt .= "Create a comprehensive, personalized learning roadmap that:\n";
-        $prompt .= "1. Analyzes the student's current skill level based on their profile and quiz performance\n";
-        $prompt .= "2. Identifies knowledge gaps from the quiz results\n";
-        $prompt .= "3. Provides a step-by-step learning path from their current level to their goal\n";
-        $prompt .= "4. Recommends specific resources, courses, or topics to study\n";
-        $prompt .= "5. Suggests a realistic timeline based on their available time per week\n";
-        $prompt .= "6. Includes milestones and checkpoints to track progress\n\n";
-        
-        $prompt .= "📝 Please format your response as a structured learning roadmap with:\n";
-        $prompt .= "- Current Skill Assessment\n";
-        $prompt .= "- Learning Objectives\n";
-        $prompt .= "- Phase-by-Phase Plan (Beginner → Intermediate → Advanced)\n";
-        $prompt .= "- Recommended Resources\n";
-        $prompt .= "- Timeline and Milestones\n";
-        $prompt .= "- Progress Tracking Methods\n\n";
-        
-        $prompt .= "Ensure the roadmap is detailed, actionable, and tailored specifically to this student's profile and goals.";
-
-        return $prompt;
+    } else {
+        $prompt .= "No quiz data available.\n";
     }
+
+    $prompt .= "
+
+YOUR TASK
+Return the final result using the following sections in this exact order:
+
+1. Roadmap Explanation:
+   - A short explanation (4–5 lines) describing why this roadmap is important.
+
+2. Key Highlights:
+   - 4–5 bullet points summarizing what the student will achieve.
+
+3. Current Skill Assessment:
+   - Strengths
+   - Weaknesses
+   - Gaps detected from quiz performance
+
+4. Learning Objectives:
+   - Clear technical and career-aligned objectives.
+
+5. Learning Roadmap (2–24 weeks):
+   - Break the roadmap into weekly or multi-week steps.
+   - ONLY step headings must use this format:
+     **Week X–Y: Step Title**
+   - Under each step (normal formatting, no bold):
+     - Topics to study
+     - Tools to use
+     - Skills learned
+     - Mini practice tasks or micro-projects
+
+6. Recommended Resources:
+   - Courses
+   - Tutorials
+   - Documentation
+   - GitHub repos
+
+7. Timeline & Milestones:
+   - Define what the student should achieve at major checkpoints.
+
+8. Progress Tracking Methods:
+   - Weekly self-checks
+   - Skill checklists
+   - Portfolio-building plan
+
+Ensure the output is clean, structured, and easy for frontend integration.
+";
+
+    return $prompt;
+}
+
+
     
     /**
      * Save generated roadmap to database
