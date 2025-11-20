@@ -40,6 +40,7 @@ Artisan::command('test:hf-api', function () {
     $this->call(TestHFAPICommand::class);
 })->purpose('Test Hugging Face API connectivity');
 
+//just to commit the data
 // Register the Hugging Face API quiz test command
 Artisan::command('test:hf-api-quiz', function () {
     $this->call(TestHFAPIQuizCommand::class);
