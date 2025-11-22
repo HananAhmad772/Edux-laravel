@@ -10,6 +10,7 @@ use App\Console\Commands\TestHFAPICommand;
 use App\Console\Commands\TestHFAPIQuizCommand;
 use App\Console\Commands\TestAIQuizServiceCommand;
 use App\Console\Commands\CheckRoadmapSchemaCommand;
+use App\Console\Commands\TestAIChatbotCommand;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -40,7 +41,6 @@ Artisan::command('test:hf-api', function () {
     $this->call(TestHFAPICommand::class);
 })->purpose('Test Hugging Face API connectivity');
 
-//just to commit the data
 // Register the Hugging Face API quiz test command
 Artisan::command('test:hf-api-quiz', function () {
     $this->call(TestHFAPIQuizCommand::class);
@@ -55,3 +55,8 @@ Artisan::command('test:ai-quiz-service', function () {
 Artisan::command('check:roadmap-schema', function () {
     $this->call(CheckRoadmapSchemaCommand::class);
 })->purpose('Check the student_roadmaps table schema');
+
+// Register the AI chatbot test command
+Artisan::command('test:ai-chatbot', function () {
+    $this->call(TestAIChatbotCommand::class);
+})->purpose('Test the AI chatbot functionality');

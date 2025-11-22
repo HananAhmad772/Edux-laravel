@@ -12,11 +12,13 @@ use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\StudentRegisterRequest;
 use App\Http\Requests\StudentQuestionsRequest;
 use App\Http\Requests\StudentQuizRequest;
+use App\Http\Requests\AIChatbotRequest;
 use App\Http\Resources\UserResources;
 use App\Models\User;
 use App\Services\AuthServices;
 use App\Services\AdminServices;
 use App\Services\ProfileService;
+use App\Services\AIChatbotService;
 use App\Traits\ApiResponses;
 use Illuminate\Http\Request as ModelRequest;
 use Illuminate\Support\Facades\Validator;
@@ -544,6 +546,36 @@ class AuthController extends Controller
         } catch (\Throwable $th) {
             \Log::error('Getting latest student roadmap failed: ' . $th->getMessage());
             return $this->internalServerErrorResponse('Getting latest student roadmap failed. Please try again');
+        }
+    }
+    
+    /**
+     * Chat with AI mentor
+     */
+    public function chatWithAI(AIChatbotRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            $messages = $request->input('messages');
+            
+            // Initialize AI chatbot service
+            $chatbotService = new AIChatbotService();
+            
+            // Generate response from AI
+            $result = $chatbotService->generateResponse($messages);
+            
+            if ($result['success']) {
+                return $this->successResponse([
+                    'response' => $result['data']
+                ], $result['message']);
+            } else {
+                return $this->errorResponse($result['message'], 500);
+            }
+            
+        } catch (\Throwable $th) {
+            \Log::error('AI Chatbot failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('AI Chatbot failed. Please try again');
         }
     }
 }

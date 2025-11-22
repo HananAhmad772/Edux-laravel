@@ -31,7 +31,7 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
     Route::post('/student/generate-roadmap', 'generatePersonalizedRoadmap');
     Route::get('/student/roadmaps', 'getStudentRoadmaps');
     Route::get('/student/roadmap/latest', 'getLatestStudentRoadmap');
-   
+    Route::post('/student/chatbot', 'chatWithAI');
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()
