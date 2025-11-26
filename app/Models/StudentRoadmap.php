@@ -13,11 +13,30 @@ class StudentRoadmap extends Model
     
     protected $fillable = [
         'student_id',
-        'roadmap_content'
+        'roadmap_content',
+        'roadmap_json',
+        'status'
+    ];
+    
+    protected $casts = [
+        'roadmap_json' => 'object'
     ];
     
     public function student()
     {
         return $this->belongsTo(User::class, 'student_id');
+    }
+    
+    /**
+     * Get the structured roadmap data
+     *
+     * @return array|null
+     */
+    public function getStructuredRoadmap()
+    {
+        if (is_string($this->roadmap_json)) {
+            return json_decode($this->roadmap_json, true);
+        }
+        return $this->roadmap_json;
     }
 }

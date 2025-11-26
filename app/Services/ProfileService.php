@@ -303,7 +303,7 @@ class ProfileService
     /**
      * Generate personalized learning roadmap for a student
      */
-    public function generatePersonalizedRoadmap($userId)
+    public function generatePersonalizedRoadmap($userId, $forceRegenerate = false)
     {
         \Illuminate\Support\Facades\Log::info('Starting personalized roadmap generation', ['user_id' => $userId]);
         
@@ -316,6 +316,29 @@ class ProfileService
                 'message' => 'Student profile not found',
                 'code' => 404
             ];
+        }
+        
+        // Check if user has a recent roadmap (within 24 hours) unless forced
+        if (!$forceRegenerate) {
+            $latestRoadmap = $this->profiles->getLatestStudentRoadmap($userId);
+            if ($latestRoadmap && $latestRoadmap->created_at) {
+                $hoursSinceCreation = now()->diffInHours($latestRoadmap->created_at);
+                // Block regeneration if the roadmap is less than 24 hours old
+                if ($hoursSinceCreation > 24) {
+                    \Illuminate\Support\Facades\Log::info('Roadmap regeneration blocked - within 24 hours of creation', [
+                        'user_id' => $userId,
+                        'hours_since_creation' => $hoursSinceCreation,
+                        'roadmap_id' => $latestRoadmap->id
+                    ]);
+                    $hoursRemaining = 24 - $hoursSinceCreation;
+                    return [
+                        'status' => false,
+                        'message' => 'You cannot regenerate a roadmap within 24 hours of creation. Please wait ' . $hoursRemaining . ' more hours.',
+                        'code' => 429,
+                        'hours_remaining' => $hoursRemaining
+                    ];
+                }
+            }
         }
         
         // Get student quizzes
@@ -332,12 +355,20 @@ class ProfileService
         // Generate roadmap using AI
         $roadmapResult = $this->aiRoadmapService->generateLearningRoadmap($profile, $quizData);
         
-        if ($roadmapResult['success']) {
-            // Save the generated roadmap
-            $roadmap = $this->profiles->createStudentRoadmap([
-                'student_id' => $userId,
-                'roadmap_content' => $roadmapResult['data']
-            ]);
+       if ($roadmapResult['success']) {
+
+    \Log::info('RAW ROADMAP GENERATED BEFORE SAVING =====================', [
+        'user_id'    => $userId,
+        'length'     => strlen($roadmapResult['data']),
+    ]);
+
+    \Log::info("RAW ROADMAP CONTENT:\n" . $roadmapResult['data']);
+
+    $roadmap = $this->profiles->createStudentRoadmap([
+        'student_id'      => $userId,
+        'roadmap_content' => $roadmapResult['data']
+    ]);
+
             
             return [
                 'status' => true,
@@ -390,5 +421,431 @@ class ProfileService
             'data' => $roadmap,
             'code' => 200
         ];
+    }
+    
+    /**
+     * Check if a roadmap is complete based on user progress
+     */
+    private function isRoadmapComplete($roadmap, $userProgress)
+    {
+        try {
+            // If no user progress, roadmap is not complete
+            if (!$userProgress) {
+                return false;
+            }
+            
+            // Parse roadmap content to extract steps and topics
+            $parsedRoadmap = $this->parseRoadmapContent($roadmap->roadmap_content, $roadmap->roadmap_json);
+            
+            // If no steps in roadmap, consider it incomplete
+            if (empty($parsedRoadmap)) {
+                return false;
+            }
+            
+            // Get all steps
+            $steps = array_values($parsedRoadmap);
+            $lastStep = end($steps);
+            
+            // Check if user has reached the last step and last topic
+            if ($userProgress->current_step === $lastStep['name'] || $userProgress->current_step === $lastStep['duration']) {
+                $totalTopicsInLastStep = count($lastStep['topics'] ?? []);
+                if ($userProgress->current_topic_index >= $totalTopicsInLastStep) {
+                    return true; // User has completed all topics in the last step
+                }
+            }
+            
+            return false; // User has not completed the roadmap
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error checking roadmap completion: ' . $e->getMessage());
+            return false; // In case of error, assume roadmap is not complete
+        }
+    }
+    
+    /**
+     * Parse roadmap content into structured data
+     *
+     * @param string $roadmapContent
+     * @param mixed $roadmapJson
+     * @return array
+     */
+    private function parseRoadmapContent($roadmapContent, $roadmapJson = null)
+    {
+        // If roadmap_json exists and is valid, use it
+        if ($roadmapJson) {
+            if (is_string($roadmapJson)) {
+                $decoded = json_decode($roadmapJson, true);
+                if (is_array($decoded)) {
+                    return $decoded;
+                }
+            } elseif (is_array($roadmapJson)) {
+                return $roadmapJson;
+            }
+        }
+        
+        // Otherwise, parse the content
+        return $this->parseRoadmapContentFromString($roadmapContent);
+    }
+    
+    /**
+     * Parse roadmap content from string
+     *
+     * @param string $roadmapContent
+     * @return array
+     */
+    private function parseRoadmapContentFromString($roadmapContent)
+    {
+        $steps = [];
+        $lines = explode("\n", $roadmapContent);
+        $currentStep = null;
+        $currentSection = null;
+        $stepPattern = '/^\*\*Week (\d+)–(\d+): (.+)\*\*$/';
+        
+        foreach ($lines as $line) {
+            $trimmedLine = trim($line);
+            
+            // Check for step headings
+            if (preg_match($stepPattern, $trimmedLine, $matches)) {
+                $stepName = "Week {$matches[1]}–{$matches[2]}";
+                $stepTitle = $matches[3];
+                
+                $currentStep = [
+                    'name' => $stepName,
+                    'title' => $stepTitle,
+                    'topics' => [],
+                    'tools' => [],
+                    'skills' => [],
+                    'tasks' => []
+                ];
+                
+                $steps[$stepName] = $currentStep;
+                $currentSection = null;
+            } else if ($currentStep) {
+                // Check for section headings
+                if (strpos($trimmedLine, 'Topics to study') !== false) {
+                    $currentSection = 'topics';
+                } else if (strpos($trimmedLine, 'Tools to use') !== false) {
+                    $currentSection = 'tools';
+                } else if (strpos($trimmedLine, 'Skills learned') !== false) {
+                    $currentSection = 'skills';
+                } else if (strpos($trimmedLine, 'Mini practice tasks or micro-projects') !== false) {
+                    $currentSection = 'tasks';
+                } else if ($currentSection && preg_match('/^\s*\*\s*(.+)$/', $trimmedLine, $matches)) {
+                    // Add item to current section
+                    $steps[$currentStep['name']][$currentSection][] = trim($matches[1]);
+                }
+            }
+        }
+        
+        return $steps;
+    }
+    
+    /**
+     * Get current roadmap with today's, yesterday's, and tomorrow's topics
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function getCurrentRoadmapWithTopics($userId)
+    {
+        try {
+            // Get user progress
+            $userProgress = \App\Models\UserProgress::where('user_id', $userId)->first();
+            
+            // Get latest roadmap
+            $roadmap = \App\Models\StudentRoadmap::where('student_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            if (!$roadmap) {
+                return [
+                    'status' => false,
+                    'message' => 'No roadmap found for this student',
+                    'code' => 404
+                ];
+            }
+            
+            // Parse roadmap JSON
+            $roadmapJson = $roadmap->roadmap_json ?? [];
+            $steps = $roadmapJson['steps'] ?? [];
+            
+            if (empty($steps)) {
+                return [
+                    'status' => false,
+                    'message' => 'Invalid roadmap structure',
+                    'code' => 500
+                ];
+            }
+            
+            // Get topics for dates
+            $topics = $this->getTopicsForDates($userProgress, $steps);
+            
+            return [
+                'status' => true,
+                'message' => 'Current roadmap with topics retrieved successfully',
+                'data' => [
+                    'roadmap' => $roadmap,
+                    'topics' => $topics
+                ],
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error getting current roadmap with topics: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Failed to retrieve current roadmap with topics',
+                'code' => 500
+            ];
+        }
+    }
+    
+    /**
+     * Get topics for today, yesterday, and tomorrow based on user progress
+     *
+     * @param \App\Models\UserProgress|null $userProgress
+     * @param array $steps
+     * @return array
+     */
+    private function getTopicsForDates($userProgress, $steps)
+    {
+        $topics = [
+            'today' => null,
+            'yesterday' => null,
+            'tomorrow' => null
+        ];
+        
+        if (!$userProgress || !$userProgress->current_step) {
+            // If no progress, return first topic as today's topic
+            if (!empty($steps)) {
+                $firstStep = $steps[0];
+                $firstTopic = $firstStep['topics'][0] ?? null;
+                if ($firstTopic) {
+                    $topics['today'] = [
+                        'topic' => $firstTopic,
+                        'topic_index' => 1,
+                        'step' => $firstStep['duration'] ?? '',
+                        'step_title' => $firstStep['title'] ?? ''
+                    ];
+                }
+            }
+            return $topics;
+        }
+        
+        // Find current step
+        $currentStep = null;
+        $currentStepIndex = -1;
+        foreach ($steps as $index => $step) {
+            if (($step['duration'] ?? '') === $userProgress->current_step) {
+                $currentStep = $step;
+                $currentStepIndex = $index;
+                break;
+            }
+        }
+        
+        if (!$currentStep) {
+            return $topics;
+        }
+        
+        $currentTopicIndex = $userProgress->current_topic_index;
+        $topicsList = $currentStep['topics'] ?? [];
+        
+        // Today's topic
+        if (isset($topicsList[$currentTopicIndex - 1])) {
+            $topics['today'] = [
+                'topic' => $topicsList[$currentTopicIndex - 1],
+                'topic_index' => $currentTopicIndex,
+                'step' => $userProgress->current_step,
+                'step_title' => $currentStep['title'] ?? ''
+            ];
+        }
+        
+        // Yesterday's topic (previous topic in same step, or last topic of previous step)
+        $yesterdayTopicIndex = $currentTopicIndex - 1;
+        if ($yesterdayTopicIndex >= 1 && isset($topicsList[$yesterdayTopicIndex - 1])) {
+            $topics['yesterday'] = [
+                'topic' => $topicsList[$yesterdayTopicIndex - 1],
+                'topic_index' => $yesterdayTopicIndex,
+                'step' => $userProgress->current_step,
+                'step_title' => $currentStep['title'] ?? ''
+            ];
+        } else if ($yesterdayTopicIndex === 0 && $currentStepIndex > 0) {
+            // Get last topic of previous step
+            $prevStep = $steps[$currentStepIndex - 1] ?? null;
+            if ($prevStep) {
+                $prevTopics = $prevStep['topics'] ?? [];
+                if (!empty($prevTopics)) {
+                    $topics['yesterday'] = [
+                        'topic' => end($prevTopics),
+                        'topic_index' => count($prevTopics),
+                        'step' => $prevStep['duration'] ?? '',
+                        'step_title' => $prevStep['title'] ?? ''
+                    ];
+                }
+            }
+        }
+        
+        // Tomorrow's topic (next topic in same step, or first topic of next step)
+        $tomorrowTopicIndex = $currentTopicIndex + 1;
+        if (isset($topicsList[$tomorrowTopicIndex - 1])) {
+            $topics['tomorrow'] = [
+                'topic' => $topicsList[$tomorrowTopicIndex - 1],
+                'topic_index' => $tomorrowTopicIndex,
+                'step' => $userProgress->current_step,
+                'step_title' => $currentStep['title'] ?? ''
+            ];
+        } else if ($currentStepIndex < (count($steps) - 1)) {
+            // Get first topic of next step
+            $nextStep = $steps[$currentStepIndex + 1] ?? null;
+            if ($nextStep) {
+                $nextTopics = $nextStep['topics'] ?? [];
+                if (!empty($nextTopics)) {
+                    $topics['tomorrow'] = [
+                        'topic' => $nextTopics[0],
+                        'topic_index' => 1,
+                        'step' => $nextStep['duration'] ?? '',
+                        'step_title' => $nextStep['title'] ?? ''
+                    ];
+                }
+            }
+        }
+        
+        return $topics;
+    }
+    
+    /**
+     * Advance user progress to the next topic
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function advanceUserProgress($userId)
+    {
+        try {
+            // Get user progress
+            $userProgress = \App\Models\UserProgress::where('user_id', $userId)->first();
+            
+            if (!$userProgress) {
+                return [
+                    'status' => false,
+                    'message' => 'User progress not found',
+                    'code' => 404
+                ];
+            }
+            
+            // Get latest roadmap
+            $roadmap = \App\Models\StudentRoadmap::where('student_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            if (!$roadmap) {
+                return [
+                    'status' => false,
+                    'message' => 'No roadmap found for this student',
+                    'code' => 404
+                ];
+            }
+            
+            // Parse roadmap JSON
+            $roadmapJson = $roadmap->roadmap_json ?? [];
+            $steps = $roadmapJson['steps'] ?? [];
+            
+            if (empty($steps)) {
+                return [
+                    'status' => false,
+                    'message' => 'Invalid roadmap structure',
+                    'code' => 500
+                ];
+            }
+            
+            // Find current step
+            $currentStep = null;
+            $currentStepIndex = -1;
+            foreach ($steps as $index => $step) {
+                if (($step['duration'] ?? '') === $userProgress->current_step) {
+                    $currentStep = $step;
+                    $currentStepIndex = $index;
+                    break;
+                }
+            }
+            
+            if (!$currentStep) {
+                return [
+                    'status' => false,
+                    'message' => 'Current step not found in roadmap',
+                    'code' => 500
+                ];
+            }
+            
+            $topicsList = $currentStep['topics'] ?? [];
+            $totalTopicsInStep = count($topicsList);
+            
+            // Advance to next topic
+            $newTopicIndex = $userProgress->current_topic_index + 1;
+            
+            // If we've completed all topics in current step, move to next step
+            if ($newTopicIndex > $totalTopicsInStep && $currentStepIndex < (count($steps) - 1)) {
+                $nextStep = $steps[$currentStepIndex + 1];
+                $userProgress->current_step = $nextStep['duration'] ?? '';
+                $userProgress->current_topic_index = 1;
+            } else if ($newTopicIndex <= $totalTopicsInStep) {
+                // Stay in current step, advance topic index
+                $userProgress->current_topic_index = $newTopicIndex;
+            }
+            // If we're at the last topic of the last step, we stay there
+            
+            $userProgress->save();
+            
+            return [
+                'status' => true,
+                'message' => 'User progress advanced successfully',
+                'data' => $userProgress,
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error advancing user progress: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Failed to advance user progress',
+                'code' => 500
+            ];
+        }
+    }
+    
+    /**
+     * Chat with AI using topic restrictions
+     *
+     * @param string $userId
+     * @param array $messages
+     * @return array
+     */
+    public function chatWithAI($userId, array $messages)
+    {
+        try {
+            // Get the AI chatbot mediator service
+            $aiChatbotMediatorService = new \App\Services\AIChatbotMediatorService(new \App\Services\AIChatbotService());
+            
+            // Get latest roadmap
+            $roadmap = \App\Models\StudentRoadmap::where('student_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+            
+            $roadmapId = $roadmap ? $roadmap->id : null;
+            
+            // Generate response from AI with topic restrictions
+            $result = $aiChatbotMediatorService->generateTopicRestrictedResponse($messages, $userId, $roadmapId);
+            
+            return [
+                'status' => true,
+                'message' => 'AI response generated successfully',
+                'data' => $result,
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error chatting with AI: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Failed to generate AI response',
+                'code' => 500
+            ];
+        }
     }
 }

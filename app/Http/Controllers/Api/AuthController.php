@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -10,6 +11,7 @@ use App\Http\Requests\Auth\ProfessionalRegisterRequest;
 use App\Http\Requests\Auth\RegisterationRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\StudentRegisterRequest;
+use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Requests\StudentQuestionsRequest;
 use App\Http\Requests\StudentQuizRequest;
 use App\Http\Requests\AIChatbotRequest;
@@ -550,6 +552,52 @@ class AuthController extends Controller
     }
     
     /**
+     * Get current roadmap with today's, yesterday's, and tomorrow's topics
+     */
+    public function getCurrentRoadmapWithTopics(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Get current roadmap with topics
+            $result = $this->profileService->getCurrentRoadmapWithTopics($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Getting current roadmap with topics failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting current roadmap with topics failed. Please try again');
+        }
+    }
+    
+    /**
+     * Advance user progress to the next topic
+     */
+    public function advanceUserProgress(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Advance user progress
+            $result = $this->profileService->advanceUserProgress($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Advancing user progress failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Advancing user progress failed. Please try again');
+        }
+    }
+    
+    /**
      * Chat with AI mentor
      */
     public function chatWithAI(AIChatbotRequest $request)
@@ -559,15 +607,12 @@ class AuthController extends Controller
             
             $messages = $request->input('messages');
             
-            // Initialize AI chatbot service
-            $chatbotService = new AIChatbotService();
+            // Generate response from AI with topic restrictions
+            $result = $this->profileService->chatWithAI($userId, $messages);
             
-            // Generate response from AI
-            $result = $chatbotService->generateResponse($messages);
-            
-            if ($result['success']) {
+            if ($result['status']) {
                 return $this->successResponse([
-                    'response' => $result['data']
+                    'response' => $result['data']['response']
                 ], $result['message']);
             } else {
                 return $this->errorResponse($result['message'], 500);

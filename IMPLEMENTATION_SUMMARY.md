@@ -1,115 +1,149 @@
-# Edux Laravel Project - Implementation Summary
+# Implementation Summary: Topic-Focused AI Roadmap + Dynamic Code Playground
 
 ## Overview
-This document summarizes the changes made to implement the requested features for the Edux Laravel project, which is an AI-powered learning platform.
+This implementation enhances the EduX platform with topic-focused AI roadmaps and a dynamic code playground that adapts to the user's field of study. The changes ensure exactly 6 topics per roadmap step and implement strict topic-based restrictions for the AI chatbot.
 
-## Changes Made
+## Backend Changes (Laravel)
 
-### 1. Database Modifications
+### New Database Migrations
+1. **User Progress Table** (`2025_11_23_000000_create_user_progress_table.php`)
+   - Tracks user's current step and topic index
+   - Columns: user_id, roadmap_id, current_step, current_topic_index, last_active_at
 
-#### Updated student_profiles table
-- Created migration `2025_10_27_060701_add_fields_to_student_profiles_table.php`
-- Added the following columns:
-  - `current_position` (varchar)
-  - `specialization_field` (varchar)
-  - `preferred_technologies` (text)
-  - `current_skill_level` (varchar)
-  - `main_goal` (varchar)
-  - `time_per_week` (varchar)
+2. **Messages Table** (`2025_11_23_000001_create_messages_table.php`)
+   - Stores chat history between users and AI
+   - Columns: user_id, roadmap_id, message_body, role
 
-#### Created student_quiz table
-- Created migration `2025_10_27_060830_create_student_quiz_table.php`
-- Added the following columns:
-  - `id` (primary key)
-  - `student_id` (foreign key referencing users table)
-  - `questions` (text)
-  - `answers` (text)
-  - `score` (decimal)
-  - `created_at`, `updated_at` (timestamps)
+### New Models
+1. **UserProgress** (`app/Models/UserProgress.php`)
+   - Model for tracking user progress through roadmap topics
 
-### 2. Model Updates
+2. **Message** (`app/Models/Message.php`)
+   - Model for storing chat messages
 
-#### StudentProfile Model
-- Updated `app/Models/StudentProfile.php` to include new fields in the `$fillable` array
+### Updated Services
+1. **AIRoadmapService** (`app/Services/AIRoadmapService.php`)
+   - Enhanced validation to ensure exactly 6 topics per step
+   - Added `validateAndFixRoadmapStructure()` method
+   - Added `fixStepStructure()` method to enforce structure
 
-#### StudentQuiz Model
-- Created `app/Models/StudentQuiz.php` with appropriate relationships
+2. **ProfileService** (`app/Services/ProfileService.php`)
+   - Added new methods for roadmap and progress management
+   - `getCurrentRoadmapWithTopics()` - Get roadmap with today/yesterday/tomorrow topics
+   - `parseRoadmapContent()` - Parse roadmap into structured data
+   - `getTopicsForDates()` - Extract topics for specific dates
+   - `advanceUserProgress()` - Move user to next topic
+   - `chatWithAI()` - Topic-restricted chat with AI
 
-### 3. Request Validation
+3. **New AIChatbotMediatorService** (`app/Services/AIChatbotMediatorService.php`)
+   - Implements topic-based restrictions for AI chatbot
+   - Logs all chat messages to database
+   - Builds system prompts with topic restrictions
 
-#### StudentRegisterRequest
-- Removed `major_subject` field as required
+### Updated Repositories
+1. **ProfileRepository** (`app/Repositories/ProfileRepository.php`)
+   - Added methods for user progress management
+   - `createUserProgress()`, `getUserProgress()`, `updateUserProgress()`
+   - `getOrCreateUserProgress()` - Initialize progress when roadmap is created
 
-#### StudentQuestionsRequest
-- Created new request for student questions API with validation rules
+### Updated Controllers
+1. **AuthController** (`app/Http/Controllers/Api/AuthController.php`)
+   - Added new endpoints for roadmap and progress management
+   - `getCurrentRoadmapWithTopics()` - Get current roadmap with topics
+   - `advanceUserProgress()` - Advance to next topic
+   - Modified `chatWithAI()` to use topic restrictions
 
-#### StudentQuizRequest
-- Created new request for student quiz API with validation rules
+### Updated Routes
+1. **api.php** (`routes/api.php`)
+   - Added new endpoints:
+     - `GET /auth/student/roadmap/current` - Get current roadmap with topics
+     - `POST /auth/student/roadmap/advance` - Advance to next topic
 
-### 4. Repository Updates
+### Updated Service Providers
+1. **AppServiceProvider** (`app/Providers/AppServiceProvider.php`)
+   - Registered new AIChatbotService and AIChatbotMediatorService
 
-#### ProfileRepository
-- Added methods for creating and retrieving student quizzes
+### Tests
+1. **AIRoadmapServiceTest** (`tests/Feature/AIRoadmapServiceTest.php`)
+   - Tests for roadmap structure validation
+   - Verifies exactly 6 topics per step
 
-### 5. Service Updates
+2. **ProfileServiceTest** (`tests/Feature/ProfileServiceTest.php`)
+   - Tests for roadmap content parsing
+   - Verifies topic count enforcement
 
-#### ProfileService
-- Added methods for:
-  - Updating student questions data
-  - Storing student quiz data
-  - Retrieving student quizzes
+## Frontend Changes (React)
 
-### 6. Controller Updates
+### New Utilities
+1. **languageMapper.js** (`src/utils/languageMapper.js`)
+   - `getLanguageForField()` - Maps fields to CodeMirror languages
+   - `isCodingField()` - Determines if field is coding-related
 
-#### AuthController
-- Added new API endpoints:
-  - `updateStudentQuestions` - for storing student questions data
-  - `storeStudentQuiz` - for storing student quiz data
-  - `getStudentQuizzes` - for retrieving student quizzes
+2. **languageMapper.test.js** (`src/utils/languageMapper.test.js`)
+   - Tests for language mapping functionality
 
-### 7. API Routes
+### Updated Components
+1. **AIMentorPage** (`src/pages/Dashboard/AIMentorPage.jsx`)
+   - Dynamic code playground that adapts to user's field
+   - Shows/hides code editor based on field type
+   - Automatically switches CodeMirror language
+   - Displays today/yesterday/tomorrow topics
+   - Clickable topic buttons for quick questions
+   - Alternate learning widget for non-coding fields
 
-#### api.php
-- Added new authenticated routes:
-  - `POST /auth/student/questions` - Update student questions
-  - `POST /auth/student/quiz` - Store student quiz
-  - `GET /auth/student/quizzes` - Get student quizzes
+## Key Features Implemented
 
-## How the Preferred Technologies Field Works
+### 1. Exactly 6 Topics Per Step
+- Backend validation ensures each roadmap step has exactly 6 topics
+- Automatic padding with placeholders if fewer than 6 topics
+- Automatic trimming if more than 6 topics
 
-The `preferred_technologies` field is designed as TEXT to accommodate multiple technologies. When a user selects "Website Development" as their major subject and "Backend" as their specialization, the system can store multiple technologies such as "Node.js" (for backend) and "MySQL/NoSQL" (for database) in this field as a JSON array or comma-separated string.
+### 2. User Progress Tracking
+- Persistent storage of current step and topic index
+- Timestamp tracking for last activity
+- API endpoints to advance progress
 
-## Quiz Flow Implementation
+### 3. Topic-Based AI Restrictions
+- AI chatbot restricted to current topic only
+- Custom system prompts with topic context
+- Out-of-scope message handling
+- Chat history logging
 
-1. Each user receives dynamically generated quiz questions from the AI
-2. When the user submits their answers, they are sent back to the AI for evaluation
-3. The AI returns the score
-4. The questions, answers, and score are stored in the `student_quiz` table
+### 4. Dynamic Code Playground
+- Language auto-detection based on user's field
+- JavaScript/Python support with appropriate CodeMirror extensions
+- Hide/show based on field type (coding vs non-coding)
+- Alternate learning widget for non-coding fields
 
-## API Endpoints
+### 5. Today/Yesterday/Tomorrow Topics
+- API endpoint to retrieve contextually relevant topics
+- UI display of current learning context
+- Clickable topic buttons for quick questions
 
-### Student Questions
-- **Endpoint**: `POST /auth/student/questions`
-- **Purpose**: Store student profile information including:
-  - major_subject
-  - current_position
-  - specialization_field
-  - preferred_technologies
-  - current_skill_level
-  - main_goal
-  - time_per_week
+## API Endpoints Added
 
-### Student Quiz
-- **Endpoint**: `POST /auth/student/quiz`
-- **Purpose**: Store quiz data including:
-  - questions
-  - answers
-  - score (received from AI after evaluation)
+1. `GET /auth/student/roadmap/current`
+   - Returns current roadmap with parsed steps and topics
+   - Includes today/yesterday/tomorrow topics
 
-### Get Student Quizzes
-- **Endpoint**: `GET /auth/student/quizzes`
-- **Purpose**: Retrieve all quizzes for the authenticated student
+2. `POST /auth/student/roadmap/advance`
+   - Advances user to next topic
+   - Updates progress tracking
 
-## Security and Validation
+## Testing
 
-All new endpoints are protected by the `auth:sanctum` middleware, ensuring only authenticated users can access them. Request validation is implemented for all new endpoints to ensure data integrity.
+Unit and integration tests verify:
+- Roadmap generator returns exactly 6 topics per step
+- API endpoints return correct topic data
+- Progress advancement logic works correctly
+- Language mapping functions correctly
+
+## Non-Negotiable Constraints Maintained
+
+✅ No credential values changed
+✅ Roadmap output structure preserved
+✅ Exactly 6 topics per step enforced
+✅ Required headings always included
+✅ Topic-restricted AI chatbot implemented
+✅ User progress persistence implemented
+✅ Frontend integration preserved

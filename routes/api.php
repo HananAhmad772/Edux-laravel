@@ -24,14 +24,24 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
     Route::get('/profile', 'profile');
     Route::post('/change-password', 'changePassword');
     Route::post('/update-profile', 'updateProfile');
+    
+    // Profile completion endpoint - no profile check needed
     Route::post('/student/questions', 'updateStudentQuestions');
-    Route::post('/student/generate-quiz', 'generateAIQuiz');
-    Route::post('/student/quiz', 'storeStudentQuiz');
-    Route::get('/student/quizzes', 'getStudentQuizzes');
-    Route::post('/student/generate-roadmap', 'generatePersonalizedRoadmap');
-    Route::get('/student/roadmaps', 'getStudentRoadmaps');
-    Route::get('/student/roadmap/latest', 'getLatestStudentRoadmap');
-    Route::post('/student/chatbot', 'chatWithAI');
+    
+    // Student routes - require profile completion
+    Route::middleware([\App\Http\Middleware\CheckStudentProfile::class])->group(function () {
+        Route::post('/student/generate-quiz', 'generateAIQuiz');
+        Route::post('/student/quiz', 'storeStudentQuiz');
+        Route::get('/student/quizzes', 'getStudentQuizzes');
+        Route::post('/student/generate-roadmap', 'generatePersonalizedRoadmap');
+        Route::get('/student/roadmaps', 'getStudentRoadmaps');
+        Route::get('/student/roadmap/latest', 'getLatestStudentRoadmap');
+        Route::get('/student/roadmap/current', 'getCurrentRoadmapWithTopics');
+        Route::post('/student/roadmap/advance', 'advanceUserProgress');
+        Route::post('/student/chatbot', 'chatWithAI');
+        Route::get('/student/chat/history', 'getChatHistory');
+        Route::get('/student/dashboard', 'getDashboardData');
+    });
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()
