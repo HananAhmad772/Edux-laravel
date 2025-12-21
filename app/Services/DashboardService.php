@@ -6,11 +6,19 @@ use App\Models\DailyProgress;
 use App\Models\UserProgress;
 use App\Models\StudentRoadmap;
 use App\Models\StudentQuiz;
+use App\Services\BadgeService;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class DashboardService
 {
+    protected $badgeService;
+
+    public function __construct()
+    {
+        $this->badgeService = new BadgeService();
+    }
+
     /**
      * Get all dashboard data for a user
      *
@@ -496,6 +504,14 @@ class DashboardService
                 'meta' => $data['meta'] ?? []
             ]
         );
+        
+        // If topic was completed, check and award badges
+        if (!empty($data['topic_completed']) && $data['topic_completed']) {
+            $user = \App\Models\User::find($userId);
+            if ($user) {
+                $this->badgeService->checkAndAwardBadges($user);
+            }
+        }
         
         return $progress;
     }

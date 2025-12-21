@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BadgeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -40,8 +41,18 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
         Route::post('/student/roadmap/advance', 'advanceUserProgress');
         Route::post('/student/chatbot', 'chatWithAI');
         Route::get('/student/chat/history', 'getChatHistory');
-        Route::get('/student/dashboard', 'getDashboardData');
+        Route::get('/student/progress', 'getProgress');
+        
+        // Daily Challenge routes
+        Route::get('/student/daily-challenge', 'generateDailyChallenge');
+        Route::post('/student/daily-challenge/submit', 'submitDailyChallenge');
     });
+});
+
+Route::controller(BadgeController::class)->prefix('badges')->middleware('auth:sanctum')->group(function () {
+    Route::get('/', 'index');
+    Route::get('/user', 'userBadges');
+    Route::post('/award', 'awardBadge');
 });
 
 Route::controller(AuthController::class)->prefix('admin')->middleware('admin')->group(function ()

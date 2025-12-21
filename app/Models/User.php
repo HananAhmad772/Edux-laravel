@@ -55,6 +55,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'created_at' => 'datetime',
         ];
     }
     
@@ -73,18 +74,29 @@ class User extends Authenticatable
         return $this->hasOne(StudentProfile::class);
     }
 
-        public function mentorProfile()
+    public function mentorProfile()
     {
         return $this->hasOne(MentorProfile::class);
     }
 
-        public function companyProfile()
+    public function companyProfile()
     {
         return $this->hasOne(CompanyProfile::class);
     }
 
-        public function professionalProfile()
+    public function professionalProfile()
     {
         return $this->hasOne(ProfessionalProfile::class);
     }
+    
+    /**
+     * Get the number of days since registration.
+     *
+     * @return int
+     */
+    public function getDaysSinceRegistrationAttribute()
+    {
+        return $this->created_at ? $this->created_at->diffInDays(now()) : 0;
+    }
+        
 }

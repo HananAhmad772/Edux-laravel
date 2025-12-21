@@ -7,25 +7,37 @@ use App\Repositories\UserRepository;
 use App\Repositories\ProfileRepository;
 use App\Services\AIQuizService;
 use App\Services\AIRoadmapService;
+use App\Services\AIDailyChallengeService;
+use App\Services\BadgeService;
 use App\Traits\ApiResponses;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class ProfileService
 {
     use ApiResponses;
-
+    
     protected $users;
     protected $profiles;
     protected $aiQuizService;
     protected $aiRoadmapService;
+    protected $aiDailyChallengeService;
+    protected $badgeService;
 
-    public function __construct(UserRepository $users, ProfileRepository $profiles, AIQuizService $aiQuizService, AIRoadmapService $aiRoadmapService)
-    {
+    public function __construct(
+        UserRepository $users,
+        ProfileRepository $profiles,
+        AIQuizService $aiQuizService,
+        AIRoadmapService $aiRoadmapService,
+        AIDailyChallengeService $aiDailyChallengeService
+    ) {
         $this->users = $users;
         $this->profiles = $profiles;
         $this->aiQuizService = $aiQuizService;
         $this->aiRoadmapService = $aiRoadmapService;
+        $this->aiDailyChallengeService = $aiDailyChallengeService;
+        $this->badgeService = new BadgeService();
     }
 
     /**
@@ -187,14 +199,22 @@ class ProfileService
         return DB::transaction(function () use ($userId, $data) {
             $profile = $this->profiles->getStudentProfile($userId);
             
+            // If profile doesn't exist, create it
             if (!$profile) {
-                return [
-                    'status' => false,
-                    'message' => 'Student profile not found',
-                    'code' => 404
-                ];
+                $profile = $this->profiles->createStudent([
+                    'user_id' => $userId
+                ]);
+                
+                // If still no profile, return error
+                if (!$profile) {
+                    return [
+                        'status' => false,
+                        'message' => 'Failed to create student profile',
+                        'code' => 500
+                    ];
+                }
             }
-
+            
             $profile->update($data);
 
             // Generate AI quiz questions based on updated profile
@@ -271,12 +291,20 @@ class ProfileService
     {
         $profile = $this->profiles->getStudentProfile($userId);
         
+        // If profile doesn't exist, create it
         if (!$profile) {
-            return [
-                'status' => false,
-                'message' => 'Student profile not found',
-                'code' => 404
-            ];
+            $profile = $this->profiles->createStudent([
+                'user_id' => $userId
+            ]);
+            
+            // If still no profile, return error
+            if (!$profile) {
+                return [
+                    'status' => false,
+                    'message' => 'Failed to create student profile',
+                    'code' => 500
+                ];
+            }
         }
         
         $quizResult = $this->aiQuizService->generateQuizQuestions($profile);
@@ -309,13 +337,21 @@ class ProfileService
         
         $profile = $this->profiles->getStudentProfile($userId);
         
+        // If profile doesn't exist, create it
         if (!$profile) {
-            \Illuminate\Support\Facades\Log::warning('Student profile not found for roadmap generation', ['user_id' => $userId]);
-            return [
-                'status' => false,
-                'message' => 'Student profile not found',
-                'code' => 404
-            ];
+            $profile = $this->profiles->createStudent([
+                'user_id' => $userId
+            ]);
+            
+            // If still no profile, return error
+            if (!$profile) {
+                \Illuminate\Support\Facades\Log::warning('Failed to create student profile for roadmap generation', ['user_id' => $userId]);
+                return [
+                    'status' => false,
+                    'message' => 'Failed to create student profile',
+                    'code' => 500
+                ];
+            }
         }
         
         // Check if user has a recent roadmap (within 24 hours) unless forced
@@ -324,7 +360,7 @@ class ProfileService
             if ($latestRoadmap && $latestRoadmap->created_at) {
                 $hoursSinceCreation = now()->diffInHours($latestRoadmap->created_at);
                 // Block regeneration if the roadmap is less than 24 hours old
-                if ($hoursSinceCreation > 24) {
+                if ($hoursSinceCreation < 24) {
                     \Illuminate\Support\Facades\Log::info('Roadmap regeneration blocked - within 24 hours of creation', [
                         'user_id' => $userId,
                         'hours_since_creation' => $hoursSinceCreation,
@@ -364,10 +400,16 @@ class ProfileService
 
     \Log::info("RAW ROADMAP CONTENT:\n" . $roadmapResult['data']);
 
-    $roadmap = $this->profiles->createStudentRoadmap([
-        'student_id'      => $userId,
-        'roadmap_content' => $roadmapResult['data']
-    ]);
+    // Use the AIRoadmapService saveRoadmap method to properly save both roadmap_content and roadmap_json
+    $roadmap = $this->aiRoadmapService->saveRoadmap($userId, $roadmapResult['data']);
+
+    if (!$roadmap) {
+        return [
+            'status' => false,
+            'message' => 'Failed to save roadmap to database',
+            'code' => 500
+        ];
+    }
 
             
             return [
@@ -540,7 +582,7 @@ class ProfileService
     }
     
     /**
-     * Get current roadmap with today's, yesterday's, and tomorrow's topics
+     * Get current roadmap with topics organized by days
      *
      * @param string $userId
      * @return array
@@ -566,6 +608,12 @@ class ProfileService
             
             // Parse roadmap JSON
             $roadmapJson = $roadmap->roadmap_json ?? [];
+            
+            // If roadmap_json is a string, decode it
+            if (is_string($roadmapJson)) {
+                $roadmapJson = json_decode($roadmapJson, true);
+            }
+            
             $steps = $roadmapJson['steps'] ?? [];
             
             if (empty($steps)) {
@@ -576,15 +624,61 @@ class ProfileService
                 ];
             }
             
-            // Get topics for dates
-            $topics = $this->getTopicsForDates($userProgress, $steps);
+            // Organize roadmap by days
+            $dayWiseRoadmap = $this->organizeRoadmapByDays($steps, $userProgress);
+            
+            // Get today, yesterday, and tomorrow topics
+            $todayTopic = null;
+            $yesterdayTopic = null;
+            $tomorrowTopic = null;
+            
+            if ($userProgress) {
+                $currentDayNumber = $this->getDayNumberFromProgress($userProgress, $dayWiseRoadmap);
+                
+                // Get today's topic
+                $todayKey = "day_" . $currentDayNumber;
+                if (isset($dayWiseRoadmap[$todayKey])) {
+                    $todayTopic = $dayWiseRoadmap[$todayKey];
+                }
+                
+                // Get yesterday's topic (skip Sundays - 6-day weeks)
+                $yesterdayDayNumber = $this->calculatePreviousWorkingDay($currentDayNumber);
+                $yesterdayKey = "day_" . $yesterdayDayNumber;
+                if (isset($dayWiseRoadmap[$yesterdayKey])) {
+                    $yesterdayTopic = $dayWiseRoadmap[$yesterdayKey];
+                }
+                
+                // Get tomorrow's topic (skip Sundays - 6-day weeks)
+                $tomorrowDayNumber = $this->calculateNextWorkingDay($currentDayNumber);
+                $tomorrowKey = "day_" . $tomorrowDayNumber;
+                if (isset($dayWiseRoadmap[$tomorrowKey])) {
+                    $tomorrowTopic = $dayWiseRoadmap[$tomorrowKey];
+                }
+            } else {
+                // If no progress, default to first day
+                if (isset($dayWiseRoadmap['day_1'])) {
+                    $todayTopic = $dayWiseRoadmap['day_1'];
+                    
+                    // Tomorrow would be day 2 (or day 3 if Sunday is skipped)
+                    $tomorrowDayNumber = $this->calculateNextWorkingDay(1);
+                    $tomorrowKey = "day_" . $tomorrowDayNumber;
+                    if (isset($dayWiseRoadmap[$tomorrowKey])) {
+                        $tomorrowTopic = $dayWiseRoadmap[$tomorrowKey];
+                    }
+                }
+            }
             
             return [
                 'status' => true,
                 'message' => 'Current roadmap with topics retrieved successfully',
                 'data' => [
                     'roadmap' => $roadmap,
-                    'topics' => $topics
+                    'day_wise_roadmap' => $dayWiseRoadmap,
+                    'today' => $todayTopic,
+                    'yesterday' => $yesterdayTopic,
+                    'tomorrow' => $tomorrowTopic,
+                    'current_progress' => $userProgress,
+                    'student' => \App\Models\User::with('studentProfile')->find($userId)
                 ],
                 'code' => 200
             ];
@@ -599,118 +693,115 @@ class ProfileService
     }
     
     /**
-     * Get topics for today, yesterday, and tomorrow based on user progress
+     * Organize roadmap steps into a day-wise structure
      *
-     * @param \App\Models\UserProgress|null $userProgress
      * @param array $steps
+     * @param \App\Models\UserProgress|null $userProgress
      * @return array
      */
-    private function getTopicsForDates($userProgress, $steps)
+    private function organizeRoadmapByDays($steps, $userProgress)
     {
-        $topics = [
-            'today' => null,
-            'yesterday' => null,
-            'tomorrow' => null
-        ];
+        $dayWiseRoadmap = [];
+        $dayCounter = 1;
         
-        if (!$userProgress || !$userProgress->current_step) {
-            // If no progress, return first topic as today's topic
-            if (!empty($steps)) {
-                $firstStep = $steps[0];
-                $firstTopic = $firstStep['topics'][0] ?? null;
-                if ($firstTopic) {
-                    $topics['today'] = [
-                        'topic' => $firstTopic,
-                        'topic_index' => 1,
-                        'step' => $firstStep['duration'] ?? '',
-                        'step_title' => $firstStep['title'] ?? ''
-                    ];
-                }
-            }
-            return $topics;
-        }
-        
-        // Find current step
-        $currentStep = null;
-        $currentStepIndex = -1;
-        foreach ($steps as $index => $step) {
-            if (($step['duration'] ?? '') === $userProgress->current_step) {
-                $currentStep = $step;
-                $currentStepIndex = $index;
-                break;
+        foreach ($steps as $stepIndex => $step) {
+            $stepDuration = $step['duration'] ?? '';
+            $stepTitle = $step['title'] ?? '';
+            $topics = $step['topics'] ?? [];
+            
+            // Each topic becomes a separate day
+            foreach ($topics as $topicIndex => $topic) {
+                $dayKey = "day_" . $dayCounter;
+                
+                $dayWiseRoadmap[$dayKey] = [
+                    'day_number' => $dayCounter,
+                    'topic' => $topic,
+                    'step' => $stepDuration,
+                    'step_title' => $stepTitle,
+                    'topic_index' => $topicIndex + 1,
+                    'week_number' => $this->getWeekNumber($dayCounter)
+                ];
+                
+                $dayCounter++;
             }
         }
         
-        if (!$currentStep) {
-            return $topics;
-        }
-        
-        $currentTopicIndex = $userProgress->current_topic_index;
-        $topicsList = $currentStep['topics'] ?? [];
-        
-        // Today's topic
-        if (isset($topicsList[$currentTopicIndex - 1])) {
-            $topics['today'] = [
-                'topic' => $topicsList[$currentTopicIndex - 1],
-                'topic_index' => $currentTopicIndex,
-                'step' => $userProgress->current_step,
-                'step_title' => $currentStep['title'] ?? ''
-            ];
-        }
-        
-        // Yesterday's topic (previous topic in same step, or last topic of previous step)
-        $yesterdayTopicIndex = $currentTopicIndex - 1;
-        if ($yesterdayTopicIndex >= 1 && isset($topicsList[$yesterdayTopicIndex - 1])) {
-            $topics['yesterday'] = [
-                'topic' => $topicsList[$yesterdayTopicIndex - 1],
-                'topic_index' => $yesterdayTopicIndex,
-                'step' => $userProgress->current_step,
-                'step_title' => $currentStep['title'] ?? ''
-            ];
-        } else if ($yesterdayTopicIndex === 0 && $currentStepIndex > 0) {
-            // Get last topic of previous step
-            $prevStep = $steps[$currentStepIndex - 1] ?? null;
-            if ($prevStep) {
-                $prevTopics = $prevStep['topics'] ?? [];
-                if (!empty($prevTopics)) {
-                    $topics['yesterday'] = [
-                        'topic' => end($prevTopics),
-                        'topic_index' => count($prevTopics),
-                        'step' => $prevStep['duration'] ?? '',
-                        'step_title' => $prevStep['title'] ?? ''
-                    ];
-                }
-            }
-        }
-        
-        // Tomorrow's topic (next topic in same step, or first topic of next step)
-        $tomorrowTopicIndex = $currentTopicIndex + 1;
-        if (isset($topicsList[$tomorrowTopicIndex - 1])) {
-            $topics['tomorrow'] = [
-                'topic' => $topicsList[$tomorrowTopicIndex - 1],
-                'topic_index' => $tomorrowTopicIndex,
-                'step' => $userProgress->current_step,
-                'step_title' => $currentStep['title'] ?? ''
-            ];
-        } else if ($currentStepIndex < (count($steps) - 1)) {
-            // Get first topic of next step
-            $nextStep = $steps[$currentStepIndex + 1] ?? null;
-            if ($nextStep) {
-                $nextTopics = $nextStep['topics'] ?? [];
-                if (!empty($nextTopics)) {
-                    $topics['tomorrow'] = [
-                        'topic' => $nextTopics[0],
-                        'topic_index' => 1,
-                        'step' => $nextStep['duration'] ?? '',
-                        'step_title' => $nextStep['title'] ?? ''
-                    ];
-                }
-            }
-        }
-        
-        return $topics;
+        return $dayWiseRoadmap;
     }
     
+    /**
+     * Calculate the week number based on day number (6-day weeks, skipping Sundays)
+     *
+     * @param int $dayNumber
+     * @return int
+     */
+    private function getWeekNumber($dayNumber)
+    {
+        // Since we're skipping Sundays, each week has 6 days
+        return ceil($dayNumber / 6);
+    }
+    
+    /**
+     * Calculate the previous working day (skipping Sundays)
+     *
+     * @param int $currentDay
+     * @return int
+     */
+    private function calculatePreviousWorkingDay($currentDay)
+    {
+        $previousDay = $currentDay - 1;
+        
+        // If the previous day would be a Sunday (divisible by 6 with no remainder when considering 6-day weeks)
+        // We need to skip it
+        if ($previousDay % 6 === 0 && $previousDay !== 0) {
+            $previousDay -= 1; // Skip Sunday
+        }
+        
+        return max(1, $previousDay); // Ensure we don't go below day 1
+    }
+    
+    /**
+     * Calculate the next working day (skipping Sundays)
+     *
+     * @param int $currentDay
+     * @return int
+     */
+    private function calculateNextWorkingDay($currentDay)
+    {
+        $nextDay = $currentDay + 1;
+        
+        // If the next day would be a Sunday (divisible by 6 with no remainder when considering 6-day weeks)
+        // We need to skip it
+        if ($nextDay % 6 === 0 && $nextDay !== 0) {
+            $nextDay += 1; // Skip Sunday
+        }
+        
+        return $nextDay;
+    }
+    
+    /**
+     * Get day number from user progress
+     *
+     * @param \App\Models\UserProgress $userProgress
+     * @param array $dayWiseRoadmap
+     * @return int
+     */
+    private function getDayNumberFromProgress($userProgress, $dayWiseRoadmap)
+    {
+        $currentStep = $userProgress->current_step;
+        $currentTopicIndex = $userProgress->current_topic_index;
+        
+        // Find the day number that matches the current progress
+        foreach ($dayWiseRoadmap as $dayKey => $dayData) {
+            if ($dayData['step'] === $currentStep && $dayData['topic_index'] === $currentTopicIndex) {
+                return $dayData['day_number'];
+            }
+        }
+        
+        // Default to day 1 if not found
+        return 1;
+    }
+
     /**
      * Advance user progress to the next topic
      *
@@ -794,6 +885,13 @@ class ProfileService
             
             $userProgress->save();
             
+            // Get user object to check badges
+            $user = \App\Models\User::find($userId);
+            if ($user) {
+                // Check and award badges based on updated progress
+                $this->badgeService->checkAndAwardBadges($user);
+            }
+            
             return [
                 'status' => true,
                 'message' => 'User progress advanced successfully',
@@ -848,4 +946,82 @@ class ProfileService
             ];
         }
     }
+      /**
+     * Generate daily challenge for the student
+     *
+     * @param string $userId
+     * @return array
+     */
+
+    /**
+     * Generate daily challenge for the student
+     *
+     * @param string $userId
+     * @return array
+     */
+    public function generateDailyChallenge($userId)
+    {
+        try {
+            $result = $this->aiDailyChallengeService->generateDailyChallenge($userId);
+            
+            if (!$result['success']) {
+                return [
+                    'status' => false,
+                    'message' => $result['message'],
+                    'code' => 500
+                ];
+            }
+            
+            return [
+                'status' => true,
+                'message' => $result['message'],
+                'data' => $result['data'],
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error generating daily challenge: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Failed to generate daily challenge',
+                'code' => 500
+            ];
+        }
+    }
+    
+    /**
+     * Evaluate student's submission for a daily challenge
+     *
+     * @param string $challengeId
+     * @param string $submission
+     * @return array
+     */
+    public function evaluateDailyChallengeSubmission($challengeId, $submission)
+    {
+        try {
+            $result = $this->aiDailyChallengeService->evaluateSubmission($challengeId, $submission);
+            
+            if (!$result['success']) {
+                return [
+                    'status' => false,
+                    'message' => $result['message'],
+                    'code' => 500
+                ];
+            }
+            
+            return [
+                'status' => true,
+                'message' => $result['message'],
+                'data' => $result['data'],
+                'code' => 200
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error evaluating daily challenge submission: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Failed to evaluate daily challenge submission',
+                'code' => 500
+            ];
+        }
+    }
+
 }

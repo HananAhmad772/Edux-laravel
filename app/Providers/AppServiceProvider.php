@@ -7,6 +7,8 @@ use App\Services\AIQuizService;
 use App\Services\AIRoadmapService;
 use App\Services\AIChatbotService;
 use App\Services\AIChatbotMediatorService;
+use App\Services\AIDailyChallengeService;
+use App\Repositories\ProfileRepository;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
         
         $this->app->singleton(AIChatbotMediatorService::class, function ($app) {
             return new AIChatbotMediatorService($app->make(AIChatbotService::class));
+        });
+        
+        // Register AIDailyChallengeService
+        $this->app->singleton(AIDailyChallengeService::class, function ($app) {
+            return new AIDailyChallengeService($app->make(ProfileRepository::class));
         });
     }
 

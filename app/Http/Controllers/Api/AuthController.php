@@ -22,6 +22,7 @@ use App\Services\AdminServices;
 use App\Services\ProfileService;
 use App\Services\AIChatbotService;
 use App\Traits\ApiResponses;
+use Illuminate\Http\Request;
 use Illuminate\Http\Request as ModelRequest;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -566,7 +567,20 @@ class AuthController extends Controller
                 return $this->errorResponse($result['message'], $result['code']);
             }
 
-            return $this->successResponse($result['data'], $result['message']);
+            // Format the response to match the required structure
+            $data = $result['data'];
+            
+            // Prepare the response with today, yesterday, and tomorrow topics
+            $formattedResponse = [
+                // 'today' => $data['today'],
+                // 'yesterday' => $data['yesterday'],
+                // 'tomorrow' => $data['tomorrow'],
+                'day_wise_roadmap' => $data['day_wise_roadmap'],
+                'current_progress' => $data['current_progress'],
+                'student' => new UserResources($data['student'])
+            ];
+
+            return $this->successResponse($formattedResponse, $result['message']);
 
         } catch (\Throwable $th) {
             \Log::error('Getting current roadmap with topics failed: ' . $th->getMessage());
@@ -623,4 +637,138 @@ class AuthController extends Controller
             return $this->internalServerErrorResponse('AI Chatbot failed. Please try again');
         }
     }
+    
+    /**
+     * Generate daily challenge for the student
+     */
+    public function generateDailyChallenge(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Generate daily challenge
+            $result = $this->profileService->generateDailyChallenge($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            // Extract structured data for frontend integration
+            $challenge = $result['data'];
+            $challengeData = $challenge['challenge_data'] ?? [];
+            
+            // Prepare the response with the exact parameters needed for frontend
+            $formattedResponse = [
+                'id' => $challenge['id'],
+                'topic' => $challenge['topic_name'],
+                'description' => $challenge['challenge_description'],
+                'instructions' => $challengeData['instructions'] ?? '',
+                'expected_outcome' => $challengeData['expected_outcome'] ?? '',
+                'tips' => $challengeData['tips'] ?? '',
+                'difficulty' => $challengeData['difficulty'] ?? 'Intermediate',
+                'estimated_time' => $challengeData['estimated_time'] ?? '20 minutes',
+                'solution' => $challengeData['solution'] ?? '',
+                'is_completed' => $challenge['is_completed'],
+                'points_earned' => $challenge['points_earned'],
+                'created_at' => $challenge['created_at'],
+                'updated_at' => $challenge['updated_at']
+            ];
+
+            return $this->successResponse($formattedResponse, $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Generating daily challenge failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Generating daily challenge failed. Please try again');
+        }
+    }
+    
+    /**
+     * Submit answer for daily challenge
+     */
+    public function submitDailyChallenge(Request $request)
+    {
+        try {
+            $request->validate([
+                'challenge_id' => 'required|string',
+                'submission' => 'required|string'
+            ]);
+            
+            $challengeId = $request->input('challenge_id');
+            $submission = $request->input('submission');
+            
+            // Evaluate submission
+            $result = $this->profileService->evaluateDailyChallengeSubmission($challengeId, $submission);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            // Extract structured data for frontend integration
+            $challenge = $result['data'];
+            $challengeData = $challenge['challenge_data'] ?? [];
+            
+            // Prepare the response with the exact parameters needed for frontend
+            $formattedResponse = [
+                'id' => $challenge['id'],
+                'topic' => $challenge['topic_name'],
+                'description' => $challenge['challenge_description'],
+                'instructions' => $challengeData['instructions'] ?? '',
+                'expected_outcome' => $challengeData['expected_outcome'] ?? '',
+                'tips' => $challengeData['tips'] ?? '',
+                'difficulty' => $challengeData['difficulty'] ?? 'Intermediate',
+                'estimated_time' => $challengeData['estimated_time'] ?? '20 minutes',
+                'solution' => $challengeData['solution'] ?? '',
+                'student_submission' => $challenge['student_submission'],
+                'ai_feedback' => $challenge['ai_feedback'],
+                'is_completed' => $challenge['is_completed'],
+                'points_earned' => $challenge['points_earned'],
+                'created_at' => $challenge['created_at'],
+                'updated_at' => $challenge['updated_at']
+            ];
+
+            return $this->successResponse($formattedResponse, $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Submitting daily challenge failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Submitting daily challenge failed. Please try again');
+        }
+    }
+    
+    /**
+     * Parse challenge description that may contain nested JSON
+     *
+     * @param string $description
+     * @return array
+     */
+    private function parseChallengeDescription($description)
+    {
+        // Since we're now formatting the data properly in the service, 
+        // we don't need to parse it here anymore
+        return ['description' => $description];
+    }
+    
+    /**
+     * Get dashboard data for the student
+     */
+    public function getProgress(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+            
+            // Get extended dashboard data from the extended dashboard service
+            $extendedDashboardService = new \App\Services\ExtendedDashboardService();
+            $result = $extendedDashboardService->getExtendedDashboardData($userId);
+
+            if (!$result['status']) {
+                return $this->errorResponse($result['message'], $result['code']);
+            }
+
+            return $this->successResponse($result['data'], $result['message']);
+
+        } catch (\Throwable $th) {
+            \Log::error('Getting dashboard data failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting dashboard data failed. Please try again');
+        }
+    }
+    
 }

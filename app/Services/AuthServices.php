@@ -2,9 +2,12 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Models\Badge;
+use App\Models\UserBadge;
 use App\Repositories\UserRepository;
 use App\Repositories\ProfileRepository;
 use App\Traits\ApiResponses;
+use App\Services\BadgeService;
 use Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -18,11 +21,13 @@ class AuthServices
     use ApiResponses;
     protected $users;
     protected $profiles;
+    protected $badgeService;
 
     public function __construct(UserRepository $users, ProfileRepository $profiles)
     {
         $this->users = $users;
         $this->profiles = $profiles;
+        $this->badgeService = new BadgeService();
     }
 
     /**
@@ -88,6 +93,9 @@ class AuthServices
         if (Auth::attempt(['email' => $credentials['email'], 'password' => $credentials['password']])) {
             $user = Auth::user();
 
+            // Check and award badges based on user progress
+            $this->badgeService->checkAndAwardBadges($user);
+
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return [
@@ -98,6 +106,45 @@ class AuthServices
         }
 
         return false;
+    }
+
+    /**
+     * Award the "First Login" badge to a user if they haven't received it yet
+     */
+    private function awardFirstLoginBadge($user)
+    {
+        try {
+            // Find the "First Login" badge
+            $firstLoginBadge = Badge::where('name', 'First Login')->first();
+            
+            if (!$firstLoginBadge) {
+                // Badge doesn't exist, create it
+                $firstLoginBadge = Badge::create([
+                    'name' => 'First Login',
+                    'description' => 'Completed registration',
+                    'icon' => '🎉',
+                    'criteria_type' => 'registration',
+                    'criteria_value' => 1
+                ]);
+            }
+            
+            // Check if user already has this badge
+            $existingUserBadge = UserBadge::where('user_id', $user->id)
+                ->where('badge_id', $firstLoginBadge->id)
+                ->first();
+                
+            if (!$existingUserBadge) {
+                // Award the badge
+                UserBadge::create([
+                    'user_id' => $user->id,
+                    'badge_id' => $firstLoginBadge->id,
+                    'earned_at' => now()
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Log the error but don't fail the login process
+            Log::error('Failed to award First Login badge: ' . $e->getMessage());
+        }
     }
 
      public function sendOtpToEmail($email)

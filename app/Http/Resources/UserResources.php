@@ -16,6 +16,7 @@ class UserResources extends JsonResource
             'phone' => $this->phone,
             'user_type'  => $this->user_type,
             'status' => $this->status,
+            'days_since_registration' => $this->days_since_registration,
         ];
 
         // Attach related profile based on user_type
