@@ -74,21 +74,6 @@ class User extends Authenticatable
     {
         return $this->hasOne(StudentProfile::class);
     }
-
-    public function mentorProfile()
-    {
-        return $this->hasOne(MentorProfile::class);
-    }
-
-    public function companyProfile()
-    {
-        return $this->hasOne(CompanyProfile::class);
-    }
-
-    public function professionalProfile()
-    {
-        return $this->hasOne(ProfessionalProfile::class);
-    }
     
     /**
      * Get the number of days since registration.

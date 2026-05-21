@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\CompanyRegisterRequest;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Http\Requests\Auth\MentorRegisterRequest;
-use App\Http\Requests\Auth\ProfessionalRegisterRequest;
 use App\Http\Requests\Auth\RegisterationRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\StudentRegisterRequest;
@@ -246,7 +243,7 @@ class AuthController extends Controller
 
     public function profile()
     {
-        $user = User::with('studentProfile', 'mentorProfile', 'professionalProfile', 'companyProfile')
+        $user = User::with('studentProfile')
             ->find(auth()->id());
 
         return $this->successResponse(new UserResources($user), 'User profile fetched successfully');
@@ -365,7 +362,7 @@ class AuthController extends Controller
     public function getUserById($id)
     {
         // Add relationships if needed
-        $relations = ['studentProfile', 'mentorProfile', 'professionalProfile', 'companyProfile'];
+        $relations = ['studentProfile'];
 
         $result = $this->adminService->getUserById($id, $relations);
 
