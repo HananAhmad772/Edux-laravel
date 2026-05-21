@@ -41,6 +41,11 @@ Edux is an AI-powered learning platform where students can learn from AI, get ce
 - `POST /auth/student/quiz` - Store student quiz results
 - `GET /auth/student/quizzes` - Retrieve student quizzes
 
+### API Documentation
+- Swagger UI: `GET /docs`
+- OpenAPI JSON: `GET /docs/openapi.json`
+- The documentation covers authentication, student learning flows, and badges with the shared API response format (`code`, `message`, `success`, `data`).
+
 ## Installation
 
 1. Clone the repository

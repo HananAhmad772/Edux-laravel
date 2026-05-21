@@ -27,9 +27,27 @@ class RegisterationRequest extends FormRequest
             'first_name'    => 'required|string|max:255',
             'last_name'     => 'required|string|max:255',
             'email'         => 'required|email|max:255|unique:users,email',
-            'password'      => 'required|string|min:8|confirmed',
+            'password'      => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/',
+            ],
             'phone'         => 'required|string|max:15|unique:users,phone',
-            'user_type'     => 'required|in:student,company,mentor,professional',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'email.required' => 'Email is required.',
+            'email.email' => 'Please enter a valid email address.',
+            'email.unique' => 'This email is already registered.',
+            'password.required' => 'Password is required.',
+            'password.min' => 'Password must be at least 8 characters long.',
+            'password.confirmed' => 'Password confirmation does not match.',
+            'password.regex' => 'Password must contain at least one uppercase letter, one number, and one special character.',
         ];
     }
 
@@ -37,6 +55,6 @@ class RegisterationRequest extends FormRequest
     {
         $firstError = $validator->errors()->first();
 
-        return $this->errorResponse($firstError, 422);
+        return $this->validationErrorResponse([$firstError], 'Validation failed');
     }
 }

@@ -10,9 +10,9 @@ class ResponseHelper
     public static function success($data = null, string $message = 'Success', int $status = HttpStatus::OK, array $meta = []): JsonResponse
     {
         $response = [
-            'status' => 'success',
             'code' => $status,
             'message' => $message,
+            'success' => true,
             'data' => $data,
         ];
 
@@ -26,18 +26,11 @@ class ResponseHelper
     public static function error(string $message, int $status = HttpStatus::BAD_REQUEST, array $errors = [], $data = null): JsonResponse
     {
         $response = [
-            'status' => 'error',
             'code' => $status,
             'message' => $message,
+            'success' => false,
+            'data' => $data,
         ];
-
-        if (!empty($errors)) {
-            $response['errors'] = $errors;
-        }
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
 
         return response()->json($response, $status);
     }

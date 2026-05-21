@@ -74,11 +74,6 @@ class UserRepository
             ->where('is_admin', false)         // Exclude admin
             ->whereNull('deleted_at');         // Exclude soft-deleted users
 
-        // Filter by user type
-        if (!empty($userType)) {
-            $query->where('user_type', $userType);
-        }
-
         // Search by name or email
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {

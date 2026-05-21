@@ -40,9 +40,6 @@ class ProfileService
         $this->badgeService = new BadgeService();
     }
 
-    /**
-     * Update user profile based on user type
-     */
     public function updateProfile($userId, array $data)
     {
         return DB::transaction(function () use ($userId, $data) {
@@ -56,7 +53,7 @@ class ProfileService
                 ];
             }
 
-            $userType = $user->user_type;
+            $userType = 'student';
 
             // Update basic user information
             $userData = array_filter([
@@ -71,16 +68,20 @@ class ProfileService
                 $user->update($userData);
             }
 
-            // Update profile based on user type
+            // Update the student profile only
             $profileData = $this->filterProfileData($data, $userType);
             
             if (!empty($profileData)) {
                 $profileUpdated = $this->updateProfileByType($userId, $userType, $profileData);
                 
                 if ($profileUpdated === null) {
+                    $profileUpdated = $this->profiles->createStudent(array_merge($profileData, ['user_id' => $userId]));
+                }
+
+                if ($profileUpdated === null) {
                     return [
                         'status' => false,
-                        'message' => 'Profile not found for this user type',
+                        'message' => 'Student profile not found',
                         'code' => 404
                     ];
                 }
@@ -98,69 +99,23 @@ class ProfileService
         });
     }
 
-    /**
-     * Filter profile data based on user type
-     */
     private function filterProfileData(array $data, string $userType): array
     {
-        $profileFields = [];
-
-        switch ($userType) {
-            case 'student':
-                $profileFields = ['dob', 'gender', 'class_year', 'institute', 'major_subject', 'bio', 'current_position', 'specialization_field', 'preferred_technologies', 'current_skill_level', 'main_goal', 'time_per_week'];
-                break;
-            case 'mentor':
-                $profileFields = ['qualifications', 'area_of_expertise', 'experience_years', 'institute', 'bio'];
-                break;
-            case 'professional':
-                $profileFields = ['executive_summary', 'skills', 'current_position', 'year_of_experience', 'bio'];
-                break;
-            case 'company':
-                $profileFields = ['company_size', 'industry', 'bio', 'website_link', 'location'];
-                break;
-        }
+        $profileFields = ['dob', 'gender', 'class_year', 'institute', 'major_subject', 'bio', 'current_position', 'specialization_field', 'preferred_technologies', 'current_skill_level', 'main_goal', 'time_per_week'];
 
         return array_filter($data, function($key) use ($profileFields) {
             return in_array($key, $profileFields);
         }, ARRAY_FILTER_USE_KEY);
     }
 
-    /**
-     * Update profile based on user type
-     */
     private function updateProfileByType($userId, string $userType, array $data)
     {
-        switch ($userType) {
-            case 'student':
-                return $this->profiles->updateStudent($userId, $data);
-            case 'mentor':
-                return $this->profiles->updateMentor($userId, $data);
-            case 'professional':
-                return $this->profiles->updateProfessional($userId, $data);
-            case 'company':
-                return $this->profiles->updateCompany($userId, $data);
-            default:
-                return null;
-        }
+        return $this->profiles->updateStudent($userId, $data);
     }
 
-    /**
-     * Get the appropriate profile relation based on user type
-     */
     private function getProfileRelation(string $userType): string
     {
-        switch ($userType) {
-            case 'student':
-                return 'studentProfile';
-            case 'mentor':
-                return 'mentorProfile';
-            case 'professional':
-                return 'professionalProfile';
-            case 'company':
-                return 'companyProfile';
-            default:
-                return '';
-        }
+        return 'studentProfile';
     }
 
     /**
@@ -178,7 +133,7 @@ class ProfileService
             ];
         }
 
-        $userType = $user->user_type;
+        $userType = 'student';
         $relation = $this->getProfileRelation($userType);
         
         $userWithProfile = $this->users->findUserById($userId, [$relation]);

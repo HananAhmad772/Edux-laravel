@@ -37,13 +37,24 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Drop foreign keys first
-        Schema::table('roadmap_errors', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
-            $table->dropForeign(['roadmap_id']);
-        });
-        
-        Schema::dropIfExists('roadmap_errors');
+        // Only attempt to drop foreign keys and table if it exists
+        if (Schema::hasTable('roadmap_errors')) {
+            Schema::table('roadmap_errors', function (Blueprint $table) {
+                // Use try/catch style safety by checking existence via information_schema
+                // However, checking for foreign key existence is DB-specific; we'll attempt
+                // to drop them if present to avoid migration failures.
+                $table->dropForeign(['user_id']);
+
+                // roadmap_id FK may or may not exist depending on migration order
+                try {
+                    $table->dropForeign(['roadmap_id']);
+                } catch (\Exception $e) {
+                    // ignore
+                }
+            });
+
+            Schema::dropIfExists('roadmap_errors');
+        }
     }
 };
 

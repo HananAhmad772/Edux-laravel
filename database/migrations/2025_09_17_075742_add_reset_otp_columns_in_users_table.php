@@ -22,8 +22,20 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['reset_password_otp', 'reset_password_otp_expiry']);
-        });
+        // Only attempt to drop columns if they exist to avoid SQL errors during rollback
+        $cols = [];
+        if (Schema::hasColumn('users', 'reset_password_otp')) {
+            $cols[] = 'reset_password_otp';
+        }
+
+        if (Schema::hasColumn('users', 'reset_password_otp_expiry')) {
+            $cols[] = 'reset_password_otp_expiry';
+        }
+
+        if (!empty($cols)) {
+            Schema::table('users', function (Blueprint $table) use ($cols) {
+                $table->dropColumn($cols);
+            });
+        }
     }
 };

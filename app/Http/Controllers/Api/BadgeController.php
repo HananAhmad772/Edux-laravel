@@ -7,10 +7,13 @@ use Illuminate\Http\Request;
 use App\Models\Badge;
 use App\Models\UserBadge;
 use App\Services\BadgeService;
+use App\Traits\ApiResponses;
 use Illuminate\Support\Facades\Auth;
 
 class BadgeController extends Controller
 {
+    use ApiResponses;
+
     protected $badgeService;
 
     public function __construct()
@@ -51,11 +54,7 @@ class BadgeController extends Controller
             return $badge;
         });
         
-        return response()->json([
-            'status' => true,
-            'message' => 'Badges retrieved successfully',
-            'data' => $badgesWithStatus
-        ]);
+        return $this->successResponse($badgesWithStatus, 'Badges retrieved successfully');
     }
     
     /**
@@ -78,11 +77,7 @@ class BadgeController extends Controller
                 ];
             });
         
-        return response()->json([
-            'status' => true,
-            'message' => 'User badges retrieved successfully',
-            'data' => $badges
-        ]);
+        return $this->successResponse($badges, 'User badges retrieved successfully');
     }
     
     /**
@@ -96,11 +91,7 @@ class BadgeController extends Controller
         // Check if badge exists
         $badge = Badge::find($badgeId);
         if (!$badge) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Badge not found',
-                'code' => 404
-            ], 404);
+            return $this->errorResponse('Badge not found', 404);
         }
         
         // Check if user already has this badge
@@ -109,11 +100,7 @@ class BadgeController extends Controller
             ->first();
             
         if ($existingUserBadge) {
-            return response()->json([
-                'status' => false,
-                'message' => 'User already has this badge',
-                'code' => 400
-            ], 400);
+            return $this->errorResponse('User already has this badge', 400);
         }
         
         // Award the badge
@@ -123,10 +110,6 @@ class BadgeController extends Controller
             'earned_at' => now()
         ]);
         
-        return response()->json([
-            'status' => true,
-            'message' => 'Badge awarded successfully',
-            'data' => $userBadge
-        ]);
+        return $this->successResponse($userBadge, 'Badge awarded successfully');
     }
 }

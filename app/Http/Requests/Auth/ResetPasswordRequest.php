@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Traits\ApiResponses;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
 
 class ResetPasswordRequest extends FormRequest
 {
+    use ApiResponses;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -26,5 +30,12 @@ class ResetPasswordRequest extends FormRequest
             'otp'      => 'required|string|exists:users,reset_password_otp',
             'password' => 'required|min:8|confirmed'
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        $firstError = $validator->errors()->first();
+
+        return $this->validationErrorResponse([$firstError], 'Validation failed');
     }
 }

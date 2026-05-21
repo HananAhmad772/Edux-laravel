@@ -33,25 +33,25 @@ class AdminSeeder extends Seeder
                     'is_admin' => false,
             ]);
 
-        User::create([
-                    'first_name' => 'Company',
-                    'last_name' => 'Test',
-                    'email' => 'test@company.com',
-                    'password' => bcrypt('1234567890'),
-                    'user_type' => 'company',
-                    'status' => 'approved',
-                    'is_admin' => false,
-            ]);
+        // User::create([
+        //             'first_name' => 'Company',
+        //             'last_name' => 'Test',
+        //             'email' => 'test@company.com',
+        //             'password' => bcrypt('1234567890'),
+        //             'user_type' => 'company',
+        //             'status' => 'approved',
+        //             'is_admin' => false,
+        //     ]);
 
-            User::create([
-                    'first_name' => 'Jobseeker',
-                    'last_name' => 'Test',
-                    'email' => 'test@jobseeker.com',
-                    'password' => bcrypt('1234567890'),
-                    'user_type' => 'job-seeker',
-                    'status' => 'approved',
-                    'is_admin' => false,
-            ]);
+        //     User::create([
+        //             'first_name' => 'Jobseeker',
+        //             'last_name' => 'Test',
+        //             'email' => 'test@jobseeker.com',
+        //             'password' => bcrypt('1234567890'),
+        //             'user_type' => 'job-seeker',
+        //             'status' => 'approved',
+        //             'is_admin' => false,
+        //     ]);
 
     }
 }

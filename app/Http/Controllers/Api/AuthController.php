@@ -54,35 +54,19 @@ class AuthController extends Controller
             }
 
             $validated = $validator->validated();
-            $type = $validated['user_type'];
 
-            $profileRules = [];
-            switch ($type) {
-                case 'student':
-                    $profileRules = (new StudentRegisterRequest())->rules();
-                    break;
-                case 'mentor':
-                    $profileRules = (new MentorRegisterRequest())->rules();
-                    break;
-                case 'professional':
-                    $profileRules = (new ProfessionalRegisterRequest())->rules();
-                    break;
-                case 'company':
-                    $profileRules = (new CompanyRegisterRequest())->rules();
-                    break;
+            // Platform is student-only: apply student-specific profile rules
+            $profileRules = (new StudentRegisterRequest())->rules();
+            $validator = Validator::make($request->all(), $profileRules);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray());
             }
 
-            if (!empty($profileRules)) {
-                $validator = Validator::make($request->all(), $profileRules);
-
-                if ($validator->fails()) {
-                    return $this->validationErrorResponse($validator->errors()->toArray());
-                }
-
-                $validated = array_merge($validated, $validator->validated());
-            }
+            $validated = array_merge($validated, $validator->validated());
 
             $user = $this->authService->register($validated);
+            $this->authService->sendWelcomeVerificationEmail($user);
             
             // Create authentication token for the registered user
             Auth::login($user);
@@ -103,6 +87,31 @@ class AuthController extends Controller
         }
     }
 
+    public function verifyEmail(Request $request, string $id, string $hash)
+    {
+        $user = User::find($id);
+
+        if (!$user || !hash_equals(sha1($user->email), $hash)) {
+            return response()->view('auth.email-verification-result', [
+                'title' => 'Verification failed',
+                'message' => 'The verification link is invalid or has expired.',
+                'status' => 'error',
+            ], 403);
+        }
+
+        if (is_null($user->email_verified_at)) {
+            $user->forceFill([
+                'email_verified_at' => now(),
+            ])->save();
+        }
+
+        return response()->view('auth.email-verification-result', [
+            'title' => 'Email verified',
+            'message' => 'Your email has been verified successfully. You can now use the platform.',
+            'status' => 'success',
+        ]);
+    }
+
         public function createUser(RegisterationRequest $request)
     {
         try {
@@ -115,33 +124,16 @@ class AuthController extends Controller
             }
 
             $validated = $validator->validated();
-            $type = $validated['user_type'];
 
-            $profileRules = [];
-            switch ($type) {
-                case 'student':
-                    $profileRules = (new StudentRegisterRequest())->rules();
-                    break;
-                case 'mentor':
-                    $profileRules = (new MentorRegisterRequest())->rules();
-                    break;
-                case 'professional':
-                    $profileRules = (new ProfessionalRegisterRequest())->rules();
-                    break;
-                case 'company':
-                    $profileRules = (new CompanyRegisterRequest())->rules();
-                    break;
+            // Platform is student-only: apply student-specific profile rules
+            $profileRules = (new StudentRegisterRequest())->rules();
+            $validator = Validator::make($request->all(), $profileRules);
+
+            if ($validator->fails()) {
+                return $this->validationErrorResponse($validator->errors()->toArray());
             }
 
-            if (!empty($profileRules)) {
-                $validator = Validator::make($request->all(), $profileRules);
-
-                if ($validator->fails()) {
-                    return $this->validationErrorResponse($validator->errors()->toArray());
-                }
-
-                $validated = array_merge($validated, $validator->validated());
-            }
+            $validated = array_merge($validated, $validator->validated());
 
             $user = $this->authService->register($validated);
             

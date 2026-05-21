@@ -50,7 +50,6 @@ class TestRoadmapGeneration extends Command
         } else {
             // Create a test user and student profile
             $user = User::factory()->create([
-                'user_type' => 'student',
                 'first_name' => 'Test',
                 'last_name' => 'User',
                 'email' => 'test' . time() . '@example.com'

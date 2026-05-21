@@ -2,10 +2,14 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Traits\ApiResponses;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Contracts\Validation\Validator;
 
 class VerifyOtpRequest extends FormRequest
 {
+    use ApiResponses;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -25,5 +29,12 @@ class VerifyOtpRequest extends FormRequest
            'email' => 'required|email|exists:users,email',
             'otp'   => 'required|string|exists:users,reset_password_otp'
         ];
+    }
+
+    protected function failedValidation(Validator $validator)
+    {
+        $firstError = $validator->errors()->first();
+
+        return $this->validationErrorResponse([$firstError], 'Validation failed');
     }
 }

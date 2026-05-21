@@ -27,7 +27,6 @@ class LoginRequest extends FormRequest
         return [
             'email' => 'required|email',
             'password' => 'required|string|min:8',
-            'user_type' => 'required|string|in:student,job-seeker,company,admin'
         ];
     }
 
@@ -35,6 +34,6 @@ class LoginRequest extends FormRequest
     {
         $firstError = $validator->errors()->first();
 
-        return $this->errorResponse($firstError, 422);
+            return $this->validationErrorResponse([$firstError], 'Validation failed');
     }
 }

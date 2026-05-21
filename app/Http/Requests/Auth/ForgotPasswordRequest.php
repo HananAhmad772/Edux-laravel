@@ -34,6 +34,6 @@ class ForgotPasswordRequest extends FormRequest
     {
         $firstError = $validator->errors()->first();
 
-        return $this->errorResponse($firstError, 422);
+            return $this->validationErrorResponse([$firstError], 'Validation failed');
     }
 }

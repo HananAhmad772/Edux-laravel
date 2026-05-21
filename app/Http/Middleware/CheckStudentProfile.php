@@ -27,12 +27,7 @@ class CheckStudentProfile
             ], 401);
         }
 
-        // Check if user is a student
-        if ($user->user_type !== 'student') {
-            return $next($request);
-        }
-
-        // Check if student profile exists
+        // Student-only platform: always check the student profile
         $studentProfile = StudentProfile::where('user_id', $user->id)->first();
 
         if (!$studentProfile) {

@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Mail\WelcomeVerificationMail;
 use App\Models\User;
 use App\Models\Badge;
 use App\Models\UserBadge;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Carbon\Carbon;
 use Exception;
 
@@ -46,45 +48,44 @@ class AuthServices
                 'email'      => $data['email'],
                 'password'   => $data['password'],
                 'phone'      => $data['phone'],
-                'user_type'  => $data['user_type'],
                 'status'     => 'approved',
             ];
 
             $user = $this->users->create($userPayload);
 
-            // create profile based on type
-            switch ($data['user_type']) {
-                case 'student':
-                    $this->profiles->createStudent(array_merge($data, ['user_id' => $user->id]));
-                    $user->load('studentProfile');
-                    break;
-                case 'mentor':
-                    $this->profiles->createMentor(array_merge($data, ['user_id' => $user->id]));
-                    $user->load('mentorProfile');
-                    break;
-                case 'professional':
-                    $this->profiles->createProfessional(array_merge($data, ['user_id' => $user->id]));
-                    $user->load('professionalProfile');
-                    break;
-                case 'company':
-                    $this->profiles->createCompany(array_merge($data, ['user_id' => $user->id]));
-                    $user->load('companyProfile');
-                    break;
-                default:
-                    throw new Exception('Invalid user type');
-            }
+            // Platform is student-only: create student profile
+            $this->profiles->createStudent(array_merge($data, ['user_id' => $user->id]));
+            $user->load('studentProfile');
 
             return $user->refresh();
         });
     }
 
+    public function sendWelcomeVerificationEmail(User $user): void
+    {
+        try {
+            $verificationUrl = URL::temporarySignedRoute(
+                'verification.verify',
+                now()->addDay(),
+                [
+                    'id' => $user->id,
+                    'hash' => sha1($user->email),
+                ]
+            );
+
+            Mail::to($user->email)->send(new WelcomeVerificationMail($user, $verificationUrl));
+        } catch (\Throwable $exception) {
+            Log::error('Welcome verification mail failed', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     public function login(array $credentials)
     {
-        $userType = $credentials['user_type'];
-
-        $user = User::where('email', $credentials['email'])
-                    ->where('user_type', $userType)
-                    ->first();
+        $user = User::where('email', $credentials['email'])->first();
 
         if (!$user) {
             return false; 
