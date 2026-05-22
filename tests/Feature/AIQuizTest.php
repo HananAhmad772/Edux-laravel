@@ -15,7 +15,6 @@ class AIQuizTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john@example.com',
@@ -45,7 +44,7 @@ class AIQuizTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/generate-quiz');
+        ])->postJson('/api/student/generate-quiz');
 
         // Since we're using a mock API key, we expect this to fail but still test the endpoint
         $response->assertStatus(200)
@@ -58,7 +57,6 @@ class AIQuizTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'Jane',
             'last_name' => 'Doe',
             'email' => 'jane@example.com',
@@ -92,7 +90,7 @@ class AIQuizTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/questions', $questionsData);
+        ])->postJson('/api/student/questions', $questionsData);
 
         $response->assertStatus(200)
                 ->assertJson([

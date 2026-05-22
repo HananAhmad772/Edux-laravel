@@ -48,6 +48,7 @@ class AuthServices
                 'email'      => $data['email'],
                 'password'   => $data['password'],
                 'phone'      => $data['phone'],
+                'user_type'  => 'student',
                 'status'     => 'approved',
             ];
 

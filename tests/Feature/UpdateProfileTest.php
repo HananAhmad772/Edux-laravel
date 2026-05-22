@@ -15,7 +15,6 @@ class UpdateProfileTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john@example.com',
@@ -52,7 +51,7 @@ class UpdateProfileTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/update-profile', $updateData);
+        ])->postJson('/api/student/update-profile', $updateData);
 
         $response->assertStatus(200)
                 ->assertJson([
@@ -77,7 +76,6 @@ class UpdateProfileTest extends TestCase
     public function test_validation_errors_for_invalid_data()
     {
         $user = User::factory()->create([
-            'user_type' => 'student',
             'email' => 'test@example.com'
         ]);
 
@@ -93,7 +91,7 @@ class UpdateProfileTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/update-profile', $invalidData);
+        ])->postJson('/api/student/update-profile', $invalidData);
 
         $response->assertStatus(422)
                 ->assertJson([

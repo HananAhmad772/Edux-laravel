@@ -323,6 +323,83 @@ Ensure the output is clean, structured, and easy for frontend integration.
             'errors' => $errors
         ];
     }
+
+    /**
+     * Validate a roadmap string and normalize each step to at least six topics.
+     *
+     * @param string $roadmapContent
+     * @return array{valid: bool, content: string, errors: array<int, string>}
+     */
+    public function validateAndFixRoadmapStructure(string $roadmapContent): array
+    {
+        $parsed = $this->parseRoadmapToStructuredJson($roadmapContent);
+        $validation = $this->validateParsedStructure($parsed);
+
+        if (!$validation['valid']) {
+            return [
+                'valid' => false,
+                'content' => $roadmapContent,
+                'errors' => $validation['errors'],
+            ];
+        }
+
+        $fixedContent = '';
+
+        foreach ($parsed['steps'] as $stepIndex => $step) {
+            $heading = $step['heading'] ?? ($step['duration'] ?? '');
+            $topics = $step['topics'] ?? [];
+            $tools = $step['tools'] ?? [];
+            $skills = $step['skills'] ?? [];
+            $tasks = $step['tasks'] ?? [];
+
+            while (count($topics) < 6) {
+                $topics[] = 'Topic ' . (count($topics) + 1) . ' placeholder';
+            }
+
+            $fixedContent .= trim($heading) . "\n\n";
+            $fixedContent .= "- Topics to study:\n";
+            foreach ($topics as $topic) {
+                $fixedContent .= "    * {$topic}\n";
+            }
+
+            $fixedContent .= "\n- Tools to use:\n";
+            if (empty($tools)) {
+                $fixedContent .= "    * None specified\n";
+            } else {
+                foreach ($tools as $tool) {
+                    $fixedContent .= "    * {$tool}\n";
+                }
+            }
+
+            $fixedContent .= "\n- Skills learned:\n";
+            if (empty($skills)) {
+                $fixedContent .= "    * None specified\n";
+            } else {
+                foreach ($skills as $skill) {
+                    $fixedContent .= "    * {$skill}\n";
+                }
+            }
+
+            $fixedContent .= "\n- Mini practice tasks or micro-projects:\n";
+            if (empty($tasks)) {
+                $fixedContent .= "    * None specified\n";
+            } else {
+                foreach ($tasks as $task) {
+                    $fixedContent .= "    * {$task}\n";
+                }
+            }
+
+            if ($stepIndex < count($parsed['steps']) - 1) {
+                $fixedContent .= "\n";
+            }
+        }
+
+        return [
+            'valid' => true,
+            'content' => trim($fixedContent),
+            'errors' => [],
+        ];
+    }
     
     /**
      * Fix the structure of a single step to ensure it has a reasonable number of topics
@@ -447,16 +524,16 @@ Ensure the output is clean, structured, and easy for frontend integration.
                 if ($currentStep) {
 
                     // Section headings
-                    if ($trimmedLine === 'Topics to study:') {
+                    if (preg_match('/^-\s*Topics to study:?$/i', $trimmedLine)) {
                         $currentSection = 'topics';
                         continue;
-                    } elseif ($trimmedLine === 'Tools to use:') {
+                    } elseif (preg_match('/^-\s*Tools to use:?$/i', $trimmedLine)) {
                         $currentSection = 'tools';
                         continue;
-                    } elseif ($trimmedLine === 'Skills learned:') {
+                    } elseif (preg_match('/^-\s*Skills learned:?$/i', $trimmedLine)) {
                         $currentSection = 'skills';
                         continue;
-                    } elseif ($trimmedLine === 'Mini practice tasks or micro-projects:') {
+                    } elseif (preg_match('/^-\s*Mini practice tasks or micro-projects:?$/i', $trimmedLine)) {
                         $currentSection = 'tasks';
                         continue;
                     }

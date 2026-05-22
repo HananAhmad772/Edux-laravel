@@ -7,7 +7,7 @@ use App\Services\ProfileService;
 use App\Repositories\ProfileRepository;
 use App\Services\AIQuizService;
 use App\Services\AIRoadmapService;
-use App\Services\AIChatbotMediatorService;
+use App\Services\AIDailyChallengeService;
 
 class ProfileServiceTest extends TestCase
 {
@@ -23,7 +23,7 @@ class ProfileServiceTest extends TestCase
         $profileRepository = $this->createMock(ProfileRepository::class);
         $aiQuizService = $this->createMock(AIQuizService::class);
         $aiRoadmapService = $this->createMock(AIRoadmapService::class);
-        $aiChatbotMediatorService = $this->createMock(AIChatbotMediatorService::class);
+        $aiDailyChallengeService = $this->createMock(AIDailyChallengeService::class);
         
         // Create the service
         $service = new ProfileService(
@@ -31,7 +31,7 @@ class ProfileServiceTest extends TestCase
             $profileRepository,
             $aiQuizService,
             $aiRoadmapService,
-            $aiChatbotMediatorService
+            $aiDailyChallengeService
         );
         
         $testContent = "**Week 1–2: Foundations**
@@ -112,7 +112,7 @@ class ProfileServiceTest extends TestCase
         $profileRepository = $this->createMock(ProfileRepository::class);
         $aiQuizService = $this->createMock(AIQuizService::class);
         $aiRoadmapService = $this->createMock(AIRoadmapService::class);
-        $aiChatbotMediatorService = $this->createMock(AIChatbotMediatorService::class);
+        $aiDailyChallengeService = $this->createMock(AIDailyChallengeService::class);
         
         // Create the service
         $service = new ProfileService(
@@ -120,7 +120,7 @@ class ProfileServiceTest extends TestCase
             $profileRepository,
             $aiQuizService,
             $aiRoadmapService,
-            $aiChatbotMediatorService
+            $aiDailyChallengeService
         );
         
         $testContent = "**Week 1–2: Foundations**

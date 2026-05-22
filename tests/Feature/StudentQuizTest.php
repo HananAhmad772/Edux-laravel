@@ -15,7 +15,6 @@ class StudentQuizTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john@example.com',
@@ -29,6 +28,12 @@ class StudentQuizTest extends TestCase
             'gender' => 'male',
             'class_year' => '2024',
             'institute' => 'Test University',
+            'major_subject' => 'Computer Science',
+            'current_skill_level' => 'Beginner',
+            'main_goal' => 'Get a job',
+            'major_subject' => 'Computer Science',
+            'current_skill_level' => 'Beginner',
+            'main_goal' => 'Get a job',
             'bio' => 'Test bio'
         ]);
 
@@ -45,7 +50,7 @@ class StudentQuizTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/quiz', $quizData);
+        ])->postJson('/api/student/quiz', $quizData);
 
         $response->assertStatus(201)
                 ->assertJson([
@@ -56,8 +61,8 @@ class StudentQuizTest extends TestCase
         // Verify quiz data was stored
         $this->assertDatabaseHas('student_quiz', [
             'student_id' => $user->id,
-            'questions' => 'What is PHP?',
-            'answers' => 'PHP is a server-side scripting language',
+            'questions' => '"What is PHP?"',
+            'answers' => '"PHP is a server-side scripting language"',
             'score' => 95.5
         ]);
     }
@@ -66,7 +71,6 @@ class StudentQuizTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john2@example.com',
@@ -100,12 +104,12 @@ class StudentQuizTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/questions', $questionsData);
+        ])->postJson('/api/student/questions', $questionsData);
 
         $response->assertStatus(200)
                 ->assertJson([
                     'success' => true,
-                    'message' => 'Student questions updated successfully'
+                    'message' => 'Student questions updated and quiz generated successfully'
                 ]);
 
         // Verify profile data was updated

@@ -32,7 +32,7 @@ class CheckStudentProfile
 
         if (!$studentProfile) {
             // Check if this is the profile completion endpoint - allow it
-            if ($request->is('api/auth/student/questions') && $request->isMethod('post')) {
+            if ($request->is('api/student/questions') && $request->isMethod('post')) {
                 return $next($request);
             }
 

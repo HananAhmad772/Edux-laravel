@@ -15,7 +15,6 @@ class StudentQuestionsTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => 'john@example.com',
@@ -49,12 +48,12 @@ class StudentQuestionsTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/questions', $questionsData);
+        ])->postJson('/api/student/questions', $questionsData);
 
         $response->assertStatus(200)
                 ->assertJson([
                     'success' => true,
-                    'message' => 'Student questions updated successfully'
+                    'message' => 'Student questions updated and quiz generated successfully'
                 ]);
 
         // Verify profile data was updated with formatted technologies
@@ -72,7 +71,6 @@ class StudentQuestionsTest extends TestCase
     {
         // Create a student user
         $user = User::factory()->create([
-            'user_type' => 'student',
             'first_name' => 'Jane',
             'last_name' => 'Smith',
             'email' => 'jane@example.com',
@@ -106,12 +104,12 @@ class StudentQuestionsTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
             'Accept' => 'application/json',
-        ])->postJson('/api/auth/student/questions', $questionsData);
+        ])->postJson('/api/student/questions', $questionsData);
 
         $response->assertStatus(200)
                 ->assertJson([
                     'success' => true,
-                    'message' => 'Student questions updated successfully'
+                    'message' => 'Student questions updated and quiz generated successfully'
                 ]);
 
         // Verify profile data was updated with string technologies

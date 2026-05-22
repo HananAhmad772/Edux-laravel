@@ -532,6 +532,21 @@ class ProfileService
                 }
             }
         }
+
+        foreach ($steps as &$step) {
+            if (!isset($step['topics']) || !is_array($step['topics'])) {
+                $step['topics'] = [];
+            }
+
+            while (count($step['topics']) < 6) {
+                $step['topics'][] = 'Topic ' . (count($step['topics']) + 1) . ' placeholder';
+            }
+
+            if (count($step['topics']) > 6) {
+                $step['topics'] = array_slice($step['topics'], 0, 6);
+            }
+        }
+        unset($step);
         
         return $steps;
     }

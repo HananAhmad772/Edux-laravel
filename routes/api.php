@@ -22,30 +22,34 @@ Route::controller(AuthController::class)->prefix('auth')->middleware('auth:sanct
 {
     Route::post('/logout','logout');
     Route::post('/logout-all', 'logoutfromAllDevices');
+});
+
+Route::controller(AuthController::class)->prefix('student')->middleware('auth:sanctum')->group(function ()
+{
     Route::get('/profile', 'profile');
     Route::post('/change-password', 'changePassword');
     Route::post('/update-profile', 'updateProfile');
     
     // Profile completion endpoint - no profile check needed
-    Route::post('/student/questions', 'updateStudentQuestions');
+    Route::post('/questions', 'updateStudentQuestions');
     
     // Student routes - require profile completion
     Route::middleware([\App\Http\Middleware\CheckStudentProfile::class])->group(function () {
-        Route::post('/student/generate-quiz', 'generateAIQuiz');
-        Route::post('/student/quiz', 'storeStudentQuiz');
-        Route::get('/student/quizzes', 'getStudentQuizzes');
-        Route::post('/student/generate-roadmap', 'generatePersonalizedRoadmap');
-        Route::get('/student/roadmaps', 'getStudentRoadmaps');
-        Route::get('/student/roadmap/latest', 'getLatestStudentRoadmap');
-        Route::get('/student/roadmap/current', 'getCurrentRoadmapWithTopics');
-        Route::post('/student/roadmap/advance', 'advanceUserProgress');
-        Route::post('/student/chatbot', 'chatWithAI');
-        Route::get('/student/chat/history', 'getChatHistory');
-        Route::get('/student/progress', 'getProgress');
+        Route::post('/generate-quiz', 'generateAIQuiz');
+        Route::post('/quiz', 'storeStudentQuiz');
+        Route::get('/quizzes', 'getStudentQuizzes');
+        Route::post('/generate-roadmap', 'generatePersonalizedRoadmap');
+        Route::get('/roadmaps', 'getStudentRoadmaps');
+        Route::get('/roadmap/latest', 'getLatestStudentRoadmap');
+        Route::get('/roadmap/current', 'getCurrentRoadmapWithTopics');
+        Route::post('/roadmap/advance', 'advanceUserProgress');
+        Route::post('/chatbot', 'chatWithAI');
+        Route::get('/chat/history', 'getChatHistory');
+        Route::get('/progress', 'getProgress');
         
         // Daily Challenge routes
-        Route::get('/student/daily-challenge', 'generateDailyChallenge');
-        Route::post('/student/daily-challenge/submit', 'submitDailyChallenge');
+        Route::get('/daily-challenge', 'generateDailyChallenge');
+        Route::post('/daily-challenge/submit', 'submitDailyChallenge');
     });
 });
 

@@ -14,6 +14,7 @@ use App\Http\Requests\StudentQuizRequest;
 use App\Http\Requests\AIChatbotRequest;
 use App\Http\Resources\UserResources;
 use App\Models\User;
+use App\Models\Message;
 use App\Services\AuthServices;
 use App\Services\AdminServices;
 use App\Services\ProfileService;
@@ -350,6 +351,17 @@ class AuthController extends Controller
         return $this->successResponse(null, $result['message']);
     }
 
+    public function getAllUsers(ModelRequest $request)
+    {
+        $perPage = $request->query('per_page', 10);
+        $search = $request->query('search');
+        $userType = $request->query('user_type');
+
+        $result = $this->adminService->getAllUsers($userType, $search, $perPage);
+
+        return $this->successResponse($result['data'], $result['message']);
+    }
+
     public function getDeletedUsers(ModelRequest $request)
     {
         $perPage = $request->query('per_page', 10);
@@ -624,6 +636,31 @@ class AuthController extends Controller
         } catch (\Throwable $th) {
             \Log::error('AI Chatbot failed: ' . $th->getMessage());
             return $this->internalServerErrorResponse('AI Chatbot failed. Please try again');
+        }
+    }
+
+    public function getChatHistory(ModelRequest $request)
+    {
+        try {
+            $userId = auth()->id();
+
+            $messages = Message::where('user_id', $userId)
+                ->orderBy('created_at')
+                ->get()
+                ->map(function ($message) {
+                    return [
+                        'id' => $message->id,
+                        'roadmap_id' => $message->roadmap_id,
+                        'role' => $message->role,
+                        'message_body' => $message->message_body,
+                        'created_at' => $message->created_at,
+                    ];
+                });
+
+            return $this->successResponse($messages, 'Chat history retrieved successfully');
+        } catch (\Throwable $th) {
+            \Log::error('Getting chat history failed: ' . $th->getMessage());
+            return $this->internalServerErrorResponse('Getting chat history failed. Please try again');
         }
     }
     
