@@ -74,7 +74,7 @@ class AuthServices
                 ]
             );
 
-            Mail::to($user->email)->send(new WelcomeVerificationMail($user, $verificationUrl));
+            Mail::to($user->email)->queue(new WelcomeVerificationMail($user, $verificationUrl));
         } catch (\Throwable $exception) {
             Log::error('Welcome verification mail failed', [
                 'user_id' => $user->id,
